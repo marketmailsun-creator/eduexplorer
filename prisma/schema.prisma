@@ -1,0 +1,120 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Prisma 7: No url property here anymore
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  password      String
+  image         String?
+  emailVerified DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  queries       Query[]
+  savedContent  SavedContent[]
+  preferences   UserPreferences?
+  analytics     LearningAnalytics[]
+
+  @@map("users")
+}
+
+model UserPreferences {
+  id              String  @id @default(cuid())
+  userId          String  @unique
+  learningLevel   String  @default("college")
+  preferredVoice  String  @default("professional")
+  autoAudio       Boolean @default(false)
+  theme           String  @default("light")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_preferences")
+}
+
+model Query {
+  id              String   @id @default(cuid())
+  userId          String
+  queryText       String
+  topicDetected   String?
+  complexityLevel String?
+  status          String   @default("processing")
+  createdAt       DateTime @default(now())
+
+  user         User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  researchData ResearchData?
+  content      Content[]
+
+  @@index([userId])
+  @@index([createdAt])
+  @@map("queries")
+}
+
+model ResearchData {
+  id          String   @id @default(cuid())
+  queryId     String   @unique
+  rawData     Json
+  sources     Json
+  summary     String   @db.Text
+  createdAt   DateTime @default(now())
+
+  query Query @relation(fields: [queryId], references: [id], onDelete: Cascade)
+
+  @@map("research_data")
+}
+
+model Content {
+  id            String   @id @default(cuid())
+  queryId       String
+  contentType   String
+  title         String
+  data          Json
+  storageUrl    String?
+  metadata      Json?
+  generatedAt   DateTime @default(now())
+
+  query        Query          @relation(fields: [queryId], references: [id], onDelete: Cascade)
+  savedBy      SavedContent[]
+
+  @@index([queryId])
+  @@map("content")
+}
+
+model SavedContent {
+  id        String   @id @default(cuid())
+  userId    String
+  contentId String
+  notes     String?  @db.Text
+  tags      String[]
+  savedAt   DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  content Content @relation(fields: [contentId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, contentId])
+  @@index([userId])
+  @@map("saved_content")
+}
+
+model LearningAnalytics {
+  id                   String   @id @default(cuid())
+  userId               String
+  contentId            String?
+  queryId              String?
+  timeSpent            Int
+  completionPercentage Float?
+  feedbackRating       Int?
+  recordedAt           DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([recordedAt])
+  @@map("learning_analytics")
+}
