@@ -30,11 +30,11 @@ export async function generateContentForQuery(queryId: string) {
   });
 
   // Generate audio (async, non-blocking)
-  // if (process.env.ELEVENLABS_API_KEY) {
-  //   generateAudioAsync(queryId, article).catch((error) => {
-  //     console.warn('Audio generation skipped:', error.message);
-  //   });
-  // }
+  if (process.env.ELEVENLABS_API_KEY) {
+    generateAudioAsync(queryId, article).catch((error) => {
+      console.warn('Audio generation skipped:', error.message);
+    });
+  }
 
   // Generate video (async, non-blocking)
   if (process.env.SYNTHESIA_API_KEY || process.env.PICTORY_API_KEY) {

@@ -1,6 +1,7 @@
 import { auth } from '@/auth';
+import { SplitLayoutExplore } from '@/components/features/SplitLayoutExplore';
 import { redirect } from 'next/navigation';
-import { QueryInput } from '@/components/features/QueryInput';
+
 
 export default async function ExplorePage() {
   const session = await auth();
@@ -9,15 +10,11 @@ export default async function ExplorePage() {
     redirect('/login');
   }
 
-  return (
-    <div className="container mx-auto py-8">
-      <div className="text-center mb-8">
-        <h1 className="text-4xl font-bold mb-2">Explore Any Topic</h1>
-        <p className="text-muted-foreground">
-          Ask me anything and I'll research it, explain it, and create learning materials for you.
-        </p>
+   return (
+    <div className="w-full px-6">
+      <div className="max-w-7xl mx-auto w-full">
+        <SplitLayoutExplore />
       </div>
-      <QueryInput />
     </div>
   );
 }

@@ -10,6 +10,15 @@ const config: Config = {
   theme: {
     extend: {},
   },
+  safelist: [
+    'grid',
+    'grid-cols-1',
+    'grid-cols-2',
+    'lg:grid-cols-2',
+    'gap-6',
+    'min-h-[calc(100vh-8rem)]',
+    'min-h-[calc(100vh-12rem)]',
+  ],
   plugins: [], // ✅ MUST be an array
 };
 

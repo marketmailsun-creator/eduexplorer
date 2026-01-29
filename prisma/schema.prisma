@@ -2,7 +2,6 @@ generator client {
   provider = "prisma-client-js"
 }
 
-// Prisma 7: No url property here anymore
 datasource db {
   provider = "postgresql"
 }
@@ -45,6 +44,7 @@ model Query {
   topicDetected   String?
   complexityLevel String?
   status          String   @default("processing")
+  metadata        Json?    // NEW: Store attachment info, image analyses, etc.
   createdAt       DateTime @default(now())
 
   user         User            @relation(fields: [userId], references: [id], onDelete: Cascade)

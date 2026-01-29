@@ -30,6 +30,6 @@
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts",
     "**/*.mts"
-, "src/app/api/auth/[...nextauth]/route.ts"  ],
+, "src/app/api/auth/[...nextauth]/route.ts", "src/app/(dashboard)/explore/page.tsx.bkp", "src/app/(dashboard)/results/[id]/page.tsx.backup", "src/app/(dashboard)/layout.tsx.backup"  ],
   "exclude": ["node_modules"]
 }
