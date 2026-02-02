@@ -6,6 +6,7 @@ import { writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
 import { existsSync } from 'fs';
 import { z } from 'zod';
+import { formatForAudio } from '@/lib/utils/text-formatter';
 
 const audioSchema = z.object({
   contentId: z.string(),
@@ -38,17 +39,24 @@ export async function POST(req: NextRequest) {
     }
 
     // Extract text from content
-    const text = typeof content.data === 'object' && content.data !== null
+    const rawText = typeof content.data === 'object' && content.data !== null
       ? (content.data as any).text || ''
       : String(content.data);
 
-    if (!text) {
+    if (!rawText) {
       return NextResponse.json({ error: 'No text content to convert' }, { status: 400 });
     }
 
-    // Generate audio
+    // CLEAN TEXT: Remove markdown formatting for better audio
+    const cleanText = formatForAudio(rawText);
+
+    console.log('🎤 Audio API: Cleaning text for TTS');
+    console.log('Original length:', rawText.length);
+    console.log('Cleaned length:', cleanText.length);
+
+    // Generate audio with cleaned text
     const audioBuffer = await generateSpeech({
-      text,
+      text: cleanText,
       voiceId: voiceId || 'Rachel',
     });
 
@@ -73,7 +81,11 @@ export async function POST(req: NextRequest) {
         contentType: 'audio',
         title: `${content.title} - Audio`,
         storageUrl: `/audio/${filename}`,
-        data: { duration: 0, originalContentId: contentId },
+        data: { 
+          duration: 0, 
+          originalContentId: contentId,
+          cleanedTextSample: cleanText.substring(0, 200) // Store sample for debugging
+        },
       },
       update: {
         storageUrl: `/audio/${filename}`,
@@ -85,6 +97,11 @@ export async function POST(req: NextRequest) {
       success: true,
       audioUrl: `/audio/${filename}`,
       audioContent,
+      cleaned: {
+        originalLength: rawText.length,
+        cleanedLength: cleanText.length,
+        removed: rawText.length - cleanText.length
+      }
     });
   } catch (error) {
     if (error instanceof z.ZodError) {

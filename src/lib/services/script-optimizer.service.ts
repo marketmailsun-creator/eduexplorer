@@ -1,19 +1,19 @@
-import Anthropic from '@anthropic-ai/sdk';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
-const client = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
+const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
+const genAI = GOOGLE_API_KEY ? new GoogleGenerativeAI(GOOGLE_API_KEY) : null;
 
 interface VideoScriptOptions {
   articleText: string;
   topic: string;
   maxDuration: number; // in minutes (5-8)
-  targetWords?: number; // defaults to 150-200 words per minute
+  targetWords?: number; // defaults to 150 words per minute
 }
 
 /**
- * Generate a concise video script from full article
- * Targets 5-8 minutes = ~750-1600 words
+ * Generate a concise video script from full article using Gemini
+ * Targets 5-8 minutes = ~750-1200 words = ~5000-8000 characters
+ * IMPORTANT: Must stay under 10,000 characters for ElevenLabs TTS
  */
 export async function generateVideoScript(
   options: VideoScriptOptions
@@ -22,105 +22,138 @@ export async function generateVideoScript(
     articleText,
     topic,
     maxDuration = 8,
-    targetWords = 150, // words per minute (conservative for educational content)
+    targetWords = 150,
   } = options;
 
-  const maxWords = maxDuration * targetWords;
+  const maxWords = maxDuration * targetWords; // e.g., 8 * 150 = 1200 words
+  const maxCharacters = 9500; // Leave buffer below 10,000 ElevenLabs limit
 
-  const message = await client.messages.create({
-    model: 'claude-sonnet-4-20250514',
-    max_tokens: 2000,
-    system: `You are an educational video script writer. Create engaging, concise scripts suitable for AI avatar narration.`,
-    messages: [
-      {
-        role: 'user',
-        content: `Convert this educational article into a ${maxDuration}-minute video script (approximately ${maxWords} words).
+  console.log('📝 Generating video script with Gemini...');
+  console.log(`  - Target: ${maxDuration} minutes (${maxWords} words, ~${maxCharacters} chars)`);
+
+  if (!genAI) {
+    throw new Error('GOOGLE_API_KEY not configured');
+  }
+
+  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+
+  const prompt = `Convert this educational article into a concise ${maxDuration}-minute video script.
+
+CRITICAL REQUIREMENTS:
+1. Maximum ${maxWords} words (approximately ${maxCharacters} characters)
+2. Natural conversational tone suitable for AI voiceover
+3. No visual cues, stage directions, or [VISUAL] markers
+4. Just pure narration text
+5. Clear sections but NO section headers in output
 
 ARTICLE:
 ${articleText}
 
-REQUIREMENTS:
-1. Create a compelling script for an AI avatar (female teacher) to narrate
-2. Maximum ${maxWords} words (strict limit)
-3. Structure: Introduction → 3-5 Key Points → Conclusion
-4. Use simple, conversational language (avoid complex jargon)
-5. Include natural pauses with [PAUSE] markers
-6. Add visual cue suggestions in [VISUAL: ...] markers
-7. Make it engaging and easy to understand
-8. Each section should be clearly separated
+STRUCTURE (but don't include these headers in output):
+- Brief engaging introduction (30 seconds)
+- 3-4 main points with examples (6-7 minutes)  
+- Quick summary (30 seconds)
 
-FORMAT:
-[INTRODUCTION]
-Brief hook and topic introduction
+Generate ONLY the narration text that will be spoken, nothing else:`;
 
-[POINT 1: Title]
-Explanation with example
-[VISUAL: Suggested graphic/diagram]
+  try {
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    let script = response.text();
+    
+    console.log(`✅ Initial script generated: ${script.length} characters`);
 
-[POINT 2: Title]
-...
+    // Clean up any formatting markers
+    script = cleanVideoScript(script);
 
-[CONCLUSION]
-Summary and key takeaway
+    // If still too long, truncate intelligently
+    if (script.length > maxCharacters) {
+      console.warn(`⚠️  Script too long (${script.length} chars), truncating to ${maxCharacters}`);
+      script = intelligentTruncate(script, maxCharacters);
+    }
 
-Generate the script now:`,
-      },
-    ],
-  });
-
-  const script = message.content[0].type === 'text' ? message.content[0].text : '';
-  
-  // Clean up the script
-  return cleanVideoScript(script);
+    console.log(`✅ Final script: ${script.length} characters (${script.split(/\s+/).length} words)`);
+    
+    return script;
+  } catch (error: any) {
+    console.error('❌ Gemini script generation error:', error.message);
+    throw error;
+  }
 }
 
 /**
- * Clean and format the script for video APIs
+ * Clean script of any visual markers or formatting
  */
 function cleanVideoScript(script: string): string {
   return script
-    .replace(/\[VISUAL:.*?\]/g, '') // Remove visual markers (we'll add them separately)
-    .replace(/\[PAUSE\]/g, '...') // Convert pauses to ellipsis
+    .replace(/\[VISUAL:.*?\]/gi, '') // Remove visual markers
+    .replace(/\[PAUSE\]/gi, '...') // Convert pauses
     .replace(/\[INTRODUCTION\]/gi, '') // Remove section markers
     .replace(/\[POINT \d+:.*?\]/gi, '')
     .replace(/\[CONCLUSION\]/gi, '')
+    .replace(/\[.*?\]/g, '') // Remove any remaining brackets
     .replace(/\n{3,}/g, '\n\n') // Clean up excessive newlines
+    .replace(/^\s*[-*]\s+/gm, '') // Remove bullet points
+    .replace(/^#+\s+/gm, '') // Remove markdown headers
     .trim();
 }
 
 /**
- * Extract visual cues for adding images/graphics to video
+ * Intelligently truncate script at sentence boundary
  */
-export function extractVisualCues(script: string): string[] {
-  const visualRegex = /\[VISUAL: (.*?)\]/g;
-  const visuals: string[] = [];
-  let match;
+function intelligentTruncate(script: string, maxLength: number): string {
+  if (script.length <= maxLength) return script;
 
-  while ((match = visualRegex.exec(script)) !== null) {
-    visuals.push(match[1]);
+  // Try to cut at sentence boundary
+  const truncated = script.substring(0, maxLength);
+  const lastPeriod = truncated.lastIndexOf('.');
+  const lastExclaim = truncated.lastIndexOf('!');
+  const lastQuestion = truncated.lastIndexOf('?');
+  
+  const lastSentenceEnd = Math.max(lastPeriod, lastExclaim, lastQuestion);
+  
+  if (lastSentenceEnd > maxLength * 0.9) {
+    // Cut at sentence if we're not losing too much
+    return truncated.substring(0, lastSentenceEnd + 1);
   }
-
-  return visuals;
+  
+  // Otherwise just hard cut with ellipsis
+  return truncated.substring(0, maxLength - 3) + '...';
 }
 
 /**
- * Split script into scenes for better video generation
+ * Split long script into chunks for ElevenLabs (if needed)
+ * Each chunk must be under 10,000 characters
  */
-export function splitIntoScenes(script: string): Array<{
-  text: string;
-  duration: number;
-}> {
-  const sections = script.split('\n\n').filter(s => s.trim().length > 0);
+export function splitScriptForTTS(script: string, maxChunkSize: number = 9500): string[] {
+  if (script.length <= maxChunkSize) {
+    return [script];
+  }
+
+  console.log(`📝 Splitting script into chunks (max ${maxChunkSize} chars each)...`);
+
+  const chunks: string[] = [];
+  const sentences = script.split(/(?<=[.!?])\s+/); // Split on sentence boundaries
   
-  return sections.map(section => {
-    const wordCount = section.split(/\s+/).length;
-    const duration = Math.ceil(wordCount / 2.5); // ~150 words per minute = 2.5 words per second
-    
-    return {
-      text: section.trim(),
-      duration,
-    };
+  let currentChunk = '';
+  
+  for (const sentence of sentences) {
+    if ((currentChunk + sentence).length <= maxChunkSize) {
+      currentChunk += (currentChunk ? ' ' : '') + sentence;
+    } else {
+      if (currentChunk) chunks.push(currentChunk);
+      currentChunk = sentence;
+    }
+  }
+  
+  if (currentChunk) chunks.push(currentChunk);
+  
+  console.log(`✅ Split into ${chunks.length} chunks`);
+  chunks.forEach((chunk, i) => {
+    console.log(`   Chunk ${i + 1}: ${chunk.length} characters`);
   });
+  
+  return chunks;
 }
 
 /**
@@ -128,31 +161,42 @@ export function splitIntoScenes(script: string): Array<{
  */
 export function estimateScriptDuration(script: string): number {
   const wordCount = script.split(/\s+/).length;
-  const wordsPerMinute = 150; // Conservative estimate for educational content
+  const wordsPerMinute = 150; // Conservative for educational content
   return Math.ceil((wordCount / wordsPerMinute) * 60);
 }
 
 /**
- * Generate bullet points version (for flashcards)
+ * Generate key points version (for flashcards) using Gemini
  */
 export async function generateKeyPoints(articleText: string, topic: string): Promise<string[]> {
-  const message = await client.messages.create({
-    model: 'claude-sonnet-4-20250514',
-    max_tokens: 1000,
-    messages: [
-      {
-        role: 'user',
-        content: `Extract 5-7 key points from this article about "${topic}". 
+  if (!genAI) {
+    throw new Error('GOOGLE_API_KEY not configured');
+  }
+
+  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+
+  const prompt = `Extract 5-7 key points from this article about "${topic}". 
 Each point should be ONE concise sentence (max 15 words).
 
 ARTICLE:
 ${articleText}
 
-Return ONLY the bullet points, one per line, no numbering or markdown.`,
-      },
-    ],
-  });
+Return ONLY the bullet points, one per line, no numbering or markdown.`;
 
-  const response = message.content[0].type === 'text' ? message.content[0].text : '';
-  return response.split('\n').filter(line => line.trim().length > 0);
+  try {
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const text = response.text();
+    
+    return text.split('\n').filter(line => line.trim().length > 0);
+  } catch (error: any) {
+    console.error('❌ Gemini key points error:', error.message);
+    
+    // Fallback: extract first sentence of each paragraph
+    const paragraphs = articleText.split('\n\n').filter(p => p.trim().length > 0);
+    return paragraphs
+      .map(p => p.split(/[.!?]/)[0].trim())
+      .filter(s => s.length > 20 && s.length < 150)
+      .slice(0, 7);
+  }
 }

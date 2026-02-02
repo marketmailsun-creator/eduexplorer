@@ -348,7 +348,7 @@ export function SplitLayoutExplore() {
               </div>
 
               {/* Video Player - 70% height (rest of page) */}
-              <div className="bg-white rounded-xl shadow-sm p-6 flex-1" style={{ minHeight: '300px' }}>
+              {/* <div className="bg-white rounded-xl shadow-sm p-6 flex-1" style={{ minHeight: '300px' }}>
                 <h3 className="font-medium text-gray-700 mb-4 text-sm">Video Player</h3>
                 <div className="relative w-full h-[calc(100%-2rem)] bg-black rounded-lg flex items-center justify-center overflow-hidden">
                   <video controls className="w-full h-full rounded-lg">
@@ -358,7 +358,7 @@ export function SplitLayoutExplore() {
                     Video explanation will appear here
                   </div>
                 </div>
-              </div>
+              </div> */}
             </div>
           </div>
         </div>

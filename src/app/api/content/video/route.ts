@@ -43,13 +43,13 @@ export async function POST(req: NextRequest) {
     }
 
     // Generate video
-    const videoJob = await generateVideoForQuery(queryId, articleText);
+    //const videoJob = await generateVideoForQuery(queryId, articleText);
 
-    return NextResponse.json({
-      success: true,
-      jobId: videoJob.jobId,
-      status: videoJob.status,
-    });
+    // return NextResponse.json({
+    //   success: true,
+    //   jobId: videoJob.jobId,
+    //   status: videoJob.status,
+    // });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
