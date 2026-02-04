@@ -1,11 +1,23 @@
 'use client';
 
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { BookOpen, FileText, ArrowLeft, Download, Share2 } from 'lucide-react';
+import { 
+  BookOpen, 
+  FileText, 
+  ArrowLeft, 
+  Download, 
+  Share2,
+  Minimize2,
+  Maximize2,
+  ChevronDown,
+  ChevronUp
+} from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { AudioPlayerSection } from './AudioPlayerSection';
-import { VideoPlayerSection } from './VideoPlayerSection';
+//import { VideoPlayer } from './VideoPlayer';
+import jsPDF from 'jspdf';
 
 interface SplitResultsViewProps {
   query: any;
@@ -19,9 +31,134 @@ export function SplitResultsView({ query, article, audio, video }: SplitResultsV
   const articleData = article?.data as any;
   const videoData = video?.data as any;
 
+  // Minimize/Maximize states
+  const [articleMinimized, setArticleMinimized] = useState(false);
+  const [sourcesMinimized, setSourcesMinimized] = useState(false);
+  const [audioMinimized, setAudioMinimized] = useState(false);
+  const [videoMinimized, setVideoMinimized] = useState(false);
+  const [summaryMinimized, setSummaryMinimized] = useState(false);
+
+  // Download article as PDF
+  const handleDownloadPDF = () => {
+    try {
+      const doc = new jsPDF();
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const margin = 20;
+      const maxWidth = pageWidth - 2 * margin;
+      let y = margin;
+
+      // Title
+      doc.setFontSize(18);
+      doc.setFont('helvetica', 'bold');
+      doc.text(query.queryText, margin, y);
+      y += 10;
+
+      // Metadata
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(100);
+      doc.text(`Learning Level: ${query.complexityLevel || 'College'}`, margin, y);
+      y += 5;
+      doc.text(`Generated: ${new Date().toLocaleDateString()}`, margin, y);
+      y += 15;
+
+      // Content
+      doc.setFontSize(12);
+      doc.setTextColor(0);
+      doc.setFont('helvetica', 'normal');
+      
+      const text = articleData?.text || 'Content not available';
+      const lines = doc.splitTextToSize(text, maxWidth);
+      
+      lines.forEach((line: string) => {
+        if (y > pageHeight - margin) {
+          doc.addPage();
+          y = margin;
+        }
+        doc.text(line, margin, y);
+        y += 7;
+      });
+
+      // Sources section
+      if (query.researchData?.sources && query.researchData.sources.length > 0) {
+        if (y > pageHeight - 60) {
+          doc.addPage();
+          y = margin;
+        }
+        
+        y += 10;
+        doc.setFontSize(14);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Sources & References', margin, y);
+        y += 10;
+
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+        query.researchData.sources.forEach((source: any, idx: number) => {
+          if (y > pageHeight - margin) {
+            doc.addPage();
+            y = margin;
+          }
+          
+          doc.setFont('helvetica', 'bold');
+          doc.text(`${idx + 1}. ${source.title}`, margin, y);
+          y += 5;
+          
+          doc.setFont('helvetica', 'normal');
+          doc.setTextColor(100);
+          doc.text(source.url, margin + 5, y);
+          y += 10;
+          doc.setTextColor(0);
+        });
+      }
+
+      // Save PDF
+      const filename = `${query.queryText.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.pdf`;
+      doc.save(filename);
+      
+      console.log('✅ PDF downloaded:', filename);
+    } catch (error) {
+      console.error('❌ PDF download error:', error);
+      alert('Failed to download PDF. Please try again.');
+    }
+  };
+
+  // Download audio as MP3
+  const handleDownloadAudio = async () => {
+    try {
+      if (!audio?.storageUrl) {
+        alert('Audio not available for download');
+        return;
+      }
+
+      console.log('📥 Downloading audio:', audio.storageUrl);
+
+      const response = await fetch(audio.storageUrl);
+      const blob = await response.blob();
+      
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.style.display = 'none';
+      a.href = url;
+      a.download = `${query.queryText.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.mp3`;
+      
+      document.body.appendChild(a);
+      a.click();
+      
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      console.log('✅ Audio downloaded');
+    } catch (error) {
+      console.error('❌ Audio download error:', error);
+      alert('Failed to download audio. Please try again.');
+    }
+  };
+
   return (
-    <div className="p-6 w-full">
-      <div className="max-w-7xl mx-auto w-full">
+    <div className="p-6">
+      <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-6 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -41,9 +178,9 @@ export function SplitResultsView({ query, article, audio, video }: SplitResultsV
             </div>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" size="sm">
+            <Button variant="outline" size="sm" onClick={handleDownloadPDF}>
               <Download className="h-4 w-4 mr-2" />
-              Export
+              Export PDF
             </Button>
             <Button variant="outline" size="sm">
               <Share2 className="h-4 w-4 mr-2" />
@@ -53,279 +190,235 @@ export function SplitResultsView({ query, article, audio, video }: SplitResultsV
         </div>
 
         {/* Split Layout */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 h-[calc(100vh-12rem)] w-full">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-[calc(100vh-12rem)]">
           {/* Left Side - Content and Sources */}
-          <div className="flex flex-col gap-4 overflow-auto min-h-0">
+          <div className="flex flex-col gap-4 overflow-auto">
             {/* Main Article */}
-            <div className="bg-white rounded-2xl shadow-md p-6 flex-1 flex flex-col">
-              <div className="flex items-center gap-2 mb-4">
-                <BookOpen className="h-5 w-5 text-gray-600" />
-                <h3 className="text-lg font-semibold text-gray-800">Comprehensive Explanation</h3>
-              </div>
-
-              <div className="overflow-auto min-h-0">
-                <div className="bg-gray-50 rounded-lg p-4 prose prose-slate max-w-none">
-                  {articleData?.text ? (
-                    <div className="whitespace-pre-wrap text-gray-800 leading-relaxed">
-                      {articleData.text}
-                    </div>
-                  ) : (
-                    <p className="text-gray-400 italic">
-                      Content is being generated...
-                    </p>
-                  )}
+            <Card className={`${articleMinimized ? '' : 'flex-1'} transition-all`}>
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <BookOpen className="h-4 w-4" />
+                    Comprehensive Explanation
+                  </CardTitle>
+                  <div className="flex gap-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleDownloadPDF}
+                      className="h-8 w-8 p-0"
+                      title="Download as PDF"
+                    >
+                      <Download className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setArticleMinimized(!articleMinimized)}
+                      className="h-8 w-8 p-0"
+                      title={articleMinimized ? "Maximize" : "Minimize"}
+                    >
+                      {articleMinimized ? (
+                        <ChevronDown className="h-4 w-4" />
+                      ) : (
+                        <ChevronUp className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            </div>
-
-            {/* Sources */}
-            {query.researchData && (
-              <div className="bg-white rounded-2xl shadow-md p-6">
-                <div className="flex items-center gap-2 mb-3">
-                  <FileText className="h-5 w-5 text-gray-600" />
-                  <h4 className="font-medium text-gray-800">Sources &amp; References</h4>
-                </div>
-                <div className="max-h-[300px] overflow-auto space-y-3">
-                  {(query.researchData.sources as any[])?.map((source, idx) => (
-                    <div key={idx} className="bg-gray-50 rounded-md p-3 border border-transparent hover:border-gray-200">
-                      <a
-                        href={source.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="font-medium text-blue-600 hover:underline text-sm"
-                      >
-                        {source.title}
-                      </a>
-                      <p className="text-xs text-gray-600 mt-1">
-                        {source.snippet}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Right Side - Audio and Video Players */}
-          <div className="flex flex-col gap-6 min-h-0">
-            {/* Audio Player */}
-            {audio ? (
-              <div className="bg-white rounded-2xl shadow-md p-6 flex-1 flex flex-col">
-                <h3 className="font-medium text-gray-700 mb-4">Audio Playback</h3>
-                <div className="bg-gray-50 rounded-lg p-4 flex-1 overflow-auto">
-                  <AudioPlayerSection
-                    audioUrl={audio.storageUrl!}
-                    title="Audio Narration"
-                    autoPlay={false}
-                  />
-                </div>
-              </div>
-            ) : (
-              <div className="bg-white rounded-2xl shadow-md p-6 flex-1 flex items-center">
-                <div className="w-full bg-gray-50 rounded-lg p-4 text-center">
-                  <p className="text-gray-400 text-sm">
-                    Audio narration is being generated...
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {/* Video Player */}
-            {video ? (
-              <div className="bg-white rounded-2xl shadow-md p-6 flex-1 flex flex-col">
-                <h3 className="font-medium text-gray-700 mb-4">Video Player</h3>
-                <div className="bg-gray-50 rounded-lg p-4 flex-1 overflow-auto">
-                  <VideoPlayerSection
-                    videoUrl={videoData?.videoUrl}
-                    status={videoData?.status || 'processing'}
-                    title="Video Explanation"
-                  />
-                </div>
-              </div>
-            ) : (
-              <div className="bg-white rounded-2xl shadow-md p-6 flex-1 flex items-center justify-center">
-                <div className="w-full bg-gray-50 rounded-lg p-6 text-center">
-                  <p className="text-gray-400 text-sm">
-                    Video explanation will appear here
-                  </p>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Quick Summary at Bottom */}
-        {query.researchData && (
-          <div className="mt-6 bg-white rounded-2xl shadow-md p-6">
-            <div className="mb-2">
-              <h5 className="text-lg font-semibold text-gray-800">Quick Summary</h5>
-            </div>
-            <div className="bg-gray-50 rounded-md p-4">
-              <p className="text-sm text-gray-700">
-                {query.researchData.summary}
-              </p>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-export function SplitResultsView_bk({ query, article, audio, video }: SplitResultsViewProps) {
-  const router = useRouter();
-  const articleData = article?.data as any;
-  const videoData = video?.data as any;
-
-  return (
-    <div className="p-6">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="mb-6 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => router.push('/explore')}
-            >
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back
-            </Button>
-            <div >
-              <h1 className="text-2xl font-bold text-gray-800">{query.queryText}</h1>
-              <p className="text-sm text-gray-600">
-                Level: {query.complexityLevel || 'College'}
-              </p>
-            </div>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm">
-              <Download className="h-4 w-4 mr-2" />
-              Export
-            </Button>
-            <Button variant="outline" size="sm">
-              <Share2 className="h-4 w-4 mr-2" />
-              Share
-            </Button>
-          </div>
-        </div>
-
-        {/* Split Layout */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 h-[calc(100vh-12rem)]">
-          {/* Left Side - Content and Sources */}
-          <div className="flex flex-col gap-4 overflow-auto min-h-0">
-            {/* Main Article */}
-            <Card className="flex-1">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <BookOpen className="h-5 w-5" />
-                  Comprehensive Explanation
-                </CardTitle>
               </CardHeader>
-              <CardContent className="overflow-auto max-h-[500px]">
-                <div className="prose prose-slate max-w-none">
-                  {articleData?.text ? (
-                    <div className="whitespace-pre-wrap text-gray-800 leading-relaxed">
-                      {articleData.text}
-                    </div>
-                  ) : (
-                    <p className="text-gray-400 italic">
-                      Content is being generated...
-                    </p>
-                  )}
-                </div>
-              </CardContent>
+              {!articleMinimized && (
+                <CardContent className="overflow-auto max-h-[500px]">
+                  <div className="prose prose-slate max-w-none">
+                    {articleData?.text ? (
+                      <div className="whitespace-pre-wrap text-gray-800 leading-relaxed text-sm">
+                        {articleData.text}
+                      </div>
+                    ) : (
+                      <p className="text-gray-400 italic text-sm">
+                        Content is being generated...
+                      </p>
+                    )}
+                  </div>
+                </CardContent>
+              )}
             </Card>
 
             {/* Sources */}
             {query.researchData && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <FileText className="h-5 w-5" />
-                    Sources & References
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="max-h-[300px] overflow-auto">
-                  <div className="space-y-3">
-                    {(query.researchData.sources as any[])?.map((source, idx) => (
-                      <div key={idx} className="border-l-4 border-blue-500 pl-3 py-1">
-                        <a
-                          href={source.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="font-medium text-blue-600 hover:underline text-sm"
-                        >
-                          {source.title}
-                        </a>
-                        <p className="text-xs text-gray-600 mt-1">
-                          {source.snippet}
-                        </p>
-                      </div>
-                    ))}
+              <Card className={`${sourcesMinimized ? '' : ''} transition-all`}>
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <FileText className="h-4 w-4" />
+                      Sources & References
+                    </CardTitle>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setSourcesMinimized(!sourcesMinimized)}
+                      className="h-8 w-8 p-0"
+                      title={sourcesMinimized ? "Maximize" : "Minimize"}
+                    >
+                      {sourcesMinimized ? (
+                        <ChevronDown className="h-4 w-4" />
+                      ) : (
+                        <ChevronUp className="h-4 w-4" />
+                      )}
+                    </Button>
                   </div>
-                </CardContent>
+                </CardHeader>
+                {!sourcesMinimized && (
+                  <CardContent className="max-h-[300px] overflow-auto">
+                    <div className="space-y-3">
+                      {(query.researchData.sources as any[])?.map((source, idx) => (
+                        <div key={idx} className="border-l-4 border-blue-500 pl-3 py-1">
+                          <a
+                            href={source.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="font-medium text-blue-600 hover:underline text-sm"
+                          >
+                            {source.title}
+                          </a>
+                          <p className="text-xs text-gray-600 mt-1">
+                            {source.snippet}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                )}
               </Card>
             )}
           </div>
 
           {/* Right Side - Audio and Video Players */}
-          <div className="flex flex-col gap-6 min-h-0">
+          <div className="flex flex-col gap-6">
             {/* Audio Player */}
-            {audio ? (
-              <div className="bg-white rounded-lg shadow-md p-6 flex-1">
-                <h3 className="font-medium text-gray-700 mb-4">Audio Playback</h3>
-                <AudioPlayerSection
-                  audioUrl={audio.storageUrl!}
-                  title="Audio Narration"
-                  autoPlay={false}
-                />
-              </div>
-            ) : (
-              <div className="bg-white rounded-lg shadow-md p-6 flex-1">
-                <h3 className="font-medium text-gray-700 mb-4">Audio Playback</h3>
-                <div className="flex flex-col items-center justify-center h-full text-center">
-                  <p className="text-gray-400 text-sm">
-                    Audio narration is being generated...
-                  </p>
+            {/* <Card className={`${audioMinimized ? '' : 'flex-1'} transition-all`}>
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    Audio Playback
+                  </CardTitle>
+                  <div className="flex gap-1">
+                    {audio && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleDownloadAudio}
+                        className="h-8 w-8 p-0"
+                        title="Download MP3"
+                      >
+                        <Download className="h-4 w-4" />
+                      </Button>
+                    )}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setAudioMinimized(!audioMinimized)}
+                      className="h-8 w-8 p-0"
+                      title={audioMinimized ? "Maximize" : "Minimize"}
+                    >
+                      {audioMinimized ? (
+                        <ChevronDown className="h-4 w-4" />
+                      ) : (
+                        <ChevronUp className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            )}
+              </CardHeader>
+              {!audioMinimized && (
+                <CardContent>
+                  {audio ? (
+                    <AudioPlayerSection 
+                      audioContent={audio}
+                      queryId={query.id}
+                    />
+                  ) : (
+                    <div className="flex flex-col items-center justify-center py-12 text-center">
+                      <p className="text-gray-400 text-sm">
+                        Audio narration is being generated...
+                      </p>
+                    </div>
+                  )}
+                </CardContent>
+              )}
+            </Card> */}
 
             {/* Video Player */}
-            {video ? (
-              <div className="bg-white rounded-lg shadow-md p-6 flex-1">
-                <h3 className="font-medium text-gray-700 mb-4">Video Player</h3>
-                <VideoPlayerSection
-                  videoUrl={videoData?.videoUrl}
-                  status={videoData?.status || 'processing'}
-                  title="Video Explanation"
-                />
-              </div>
-            ) : (
-              <div className="bg-white rounded-lg shadow-md p-6 flex-1">
-                <h3 className="font-medium text-gray-700 mb-4">Video Player</h3>
-                <div className="flex items-center justify-center h-full bg-gray-100 rounded-lg">
-                  <p className="text-gray-400 text-sm">
-                    Video explanation will appear here
-                  </p>
+            {/* <Card className={`${videoMinimized ? '' : 'flex-1'} transition-all`}>
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    Video Explanation
+                  </CardTitle>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setVideoMinimized(!videoMinimized)}
+                    className="h-8 w-8 p-0"
+                    title={videoMinimized ? "Maximize" : "Minimize"}
+                  >
+                    {videoMinimized ? (
+                      <ChevronDown className="h-4 w-4" />
+                    ) : (
+                      <ChevronUp className="h-4 w-4" />
+                    )}
+                  </Button>
                 </div>
-              </div>
-            )}
+              </CardHeader>
+              {!videoMinimized && (
+                <CardContent>
+                  {video ? (
+                    <VideoPlayer
+                      videoUrl={videoData?.videoUrl}
+                      status={videoData?.status || 'processing'}
+                      title="Video Explanation"
+                    />
+                  ) : (
+                    <div className="flex items-center justify-center py-12 bg-gray-100 rounded-lg">
+                      <p className="text-gray-400 text-sm">
+                        Video explanation will appear here
+                      </p>
+                    </div>
+                  )}
+                </CardContent>
+              )}
+            </Card> */}
           </div>
         </div>
 
         {/* Quick Summary at Bottom */}
         {query.researchData && (
-          <Card className="mt-6">
-            <CardHeader>
-              <CardTitle className="text-lg">Quick Summary</CardTitle>
+          <Card className={`mt-6 ${summaryMinimized ? '' : ''} transition-all`}>
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base">Quick Summary</CardTitle>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSummaryMinimized(!summaryMinimized)}
+                  className="h-8 w-8 p-0"
+                  title={summaryMinimized ? "Maximize" : "Minimize"}
+                >
+                  {summaryMinimized ? (
+                    <ChevronDown className="h-4 w-4" />
+                  ) : (
+                    <ChevronUp className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
             </CardHeader>
-            <CardContent>
-              <p className="text-sm text-gray-700">
-                {query.researchData.summary}
-              </p>
-            </CardContent>
+            {!summaryMinimized && (
+              <CardContent>
+                <p className="text-sm text-gray-700">
+                  {query.researchData.summary}
+                </p>
+              </CardContent>
+            )}
           </Card>
         )}
       </div>

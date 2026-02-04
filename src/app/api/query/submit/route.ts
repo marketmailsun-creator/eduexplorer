@@ -2,11 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { processResearchQuery } from '@/lib/services/research.service';
 import { generateContentForQuery } from '@/lib/services/content.service';
-import { analyzeImageWithClaude, transcribeAudio } from '@/lib/services/media-analysis.service';
+import { moderateContent, getModerationErrorMessage, quickModerationCheck } from '@/lib/services/content-moderation.service';
+import { prisma } from '@/lib/db/prisma';
 import { z } from 'zod';
-import { writeFile, mkdir } from 'fs/promises';
-import { join } from 'path';
-import { existsSync } from 'fs';
 
 const querySchema = z.object({
   query: z.string().min(3).max(500),
@@ -20,98 +18,61 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const formData = await req.formData();
-    const query = formData.get('query') as string;
-    const learningLevel = (formData.get('learningLevel') as string) || 'college';
+    const body = await req.json();
+    const { query, learningLevel = 'college' } = querySchema.parse(body);
 
-    // Validate basic input
-    const { query: validatedQuery, learningLevel: validatedLevel } = querySchema.parse({
-      query,
-      learningLevel,
+    console.log('📝 Query submitted:', query);
+
+    // Get user's age for age-appropriate filtering
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { age: true, dateOfBirth: true },
     });
 
-    // Process attached files (images and documents)
-    const files = formData.getAll('files') as File[];
-    const imageAnalyses: string[] = [];
-    const attachedFileUrls: string[] = [];
+    // Ensure null from the DB becomes `undefined` so it matches expected parameter type
+    const userAge: number | undefined = user?.age ?? undefined;
+    console.log('👤 User age:', userAge ?? 'unknown');
 
-    for (const file of files) {
-      if (file.size > 0) {
-        // Save file
-        const uploadsDir = join(process.cwd(), 'public', 'uploads');
-        if (!existsSync(uploadsDir)) {
-          await mkdir(uploadsDir, { recursive: true });
-        }
-
-        const timestamp = Date.now();
-        const filename = `${timestamp}-${file.name}`;
-        const filepath = join(uploadsDir, filename);
-        const bytes = await file.arrayBuffer();
-        await writeFile(filepath, Buffer.from(bytes));
-
-        attachedFileUrls.push(`/uploads/${filename}`);
-
-        // Analyze images with Claude
-        if (file.type.startsWith('image/')) {
-          const analysis = await analyzeImageWithClaude(Buffer.from(bytes), file.type);
-          imageAnalyses.push(analysis);
-        }
-      }
+    // Step 1: Quick keyword check (fast)
+    const quickCheckFailed = quickModerationCheck(query);
+    
+    if (quickCheckFailed) {
+      console.log('🚫 Quick moderation failed - running full check');
     }
 
-    // Process audio recording
-    const audioFile = formData.get('audio') as File | null;
-    let audioTranscription = '';
+    // Step 2: Full AI moderation (slower, but more accurate)
+    // Always run for minors, run for adults only if quick check failed
+    const shouldRunFullModeration = (userAge && userAge < 18) || quickCheckFailed;
 
-    if (audioFile && audioFile.size > 0) {
-      const audioBuffer = Buffer.from(await audioFile.arrayBuffer());
+    if (shouldRunFullModeration) {
+      console.log('🛡️ Running content moderation...');
       
-      // Save audio file
-      const audioDir = join(process.cwd(), 'public', 'uploads', 'audio');
-      if (!existsSync(audioDir)) {
-        await mkdir(audioDir, { recursive: true });
+      const moderationResult = await moderateContent(query, userAge);
+
+      if (!moderationResult.isAppropriate) {
+        console.log('🚫 Content blocked by moderation');
+        
+        const errorMessage = getModerationErrorMessage(moderationResult, userAge);
+        
+        return NextResponse.json(
+          { 
+            error: errorMessage,
+            moderationResult: {
+              category: moderationResult.category,
+              severity: moderationResult.severity,
+            }
+          },
+          { status: 400 }
+        );
       }
 
-      const timestamp = Date.now();
-      const audioFilename = `${timestamp}-recording.webm`;
-      const audioPath = join(audioDir, audioFilename);
-      await writeFile(audioPath, audioBuffer);
-
-      // Transcribe audio (you can implement this with Whisper API or similar)
-      audioTranscription = await transcribeAudio(audioBuffer);
+      console.log('✅ Content passed moderation');
+    } else {
+      console.log('⏩ Skipping full moderation (adult user, no flags)');
     }
 
-    // Enhance query with media context
-    let enhancedQuery = validatedQuery;
-    
-    if (imageAnalyses.length > 0) {
-      enhancedQuery += '\n\nAttached images show: ' + imageAnalyses.join('; ');
-    }
-    
-    if (audioTranscription) {
-      enhancedQuery += '\n\nAdditional context from audio: ' + audioTranscription;
-    }
-
-    // Process the research query
-    const result = await processResearchQuery(
-      session.user.id,
-      enhancedQuery,
-      validatedLevel as string
-    );
-
-    // Store attachment references
-    if (attachedFileUrls.length > 0 || audioTranscription) {
-      await prisma.query.update({
-        where: { id: result.queryId },
-        data: {
-          metadata: {
-            attachments: attachedFileUrls,
-            hasAudio: !!audioTranscription,
-            imageAnalyses,
-          },
-        },
-      });
-    }
+    // Process the query
+    const result = await processResearchQuery(session.user.id, query, learningLevel);
 
     // Generate content asynchronously
     generateContentForQuery(result.queryId).catch(console.error);
@@ -121,10 +82,6 @@ export async function POST(req: NextRequest) {
       queryId: result.queryId,
       content: result.content,
       sources: result.sources,
-      mediaProcessed: {
-        images: imageAnalyses.length,
-        audio: !!audioTranscription,
-      },
     });
   } catch (error) {
     if (error instanceof z.ZodError) {

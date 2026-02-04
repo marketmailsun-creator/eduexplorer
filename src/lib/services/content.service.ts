@@ -1,29 +1,29 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import OpenAI from 'openai';
 import { generateSpeech } from '../api/elevenlabs';
-import { generateAudioSummary, estimateAudioDuration } from './audio-summarizer';
 import { prisma } from '../db/prisma';
 import { writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
 import { existsSync } from 'fs';
 
-const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
-const genAI = GOOGLE_API_KEY ? new GoogleGenerativeAI(GOOGLE_API_KEY) : null;
+// Use Groq (OpenAI-compatible API)
+const GROQ_API_KEY = process.env.GROQ_API_KEY;
+const groq = GROQ_API_KEY ? new OpenAI({
+  apiKey: GROQ_API_KEY,
+  baseURL: 'https://api.groq.com/openai/v1',
+}) : null;
 
-console.log('🔑 Content Service - API Key Status:');
-console.log('  - GOOGLE_API_KEY:', GOOGLE_API_KEY ? '✅ SET' : '❌ MISSING');
+console.log('🔑 Content Service - Groq API:', GROQ_API_KEY ? '✅ SET' : '❌ MISSING');
 
-async function generateArticleWithGemini(
+async function generateArticleWithGroq(
   researchData: string,
   topic: string,
   learningLevel: string = 'college'
 ): Promise<string> {
-  if (!genAI) {
-    throw new Error('GOOGLE_API_KEY not configured');
+  if (!groq) {
+    throw new Error('GROQ_API_KEY not configured');
   }
 
-  console.log('📝 Generating article with Google Gemini...');
-
-  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+  console.log('📝 Generating article with Groq (Llama 3.1)...');
 
   const levelGuidelines = {
     elementary: 'Use simple language, short sentences, and lots of examples',
@@ -32,9 +32,9 @@ async function generateArticleWithGemini(
     adult: 'Professional tone, practical applications, career relevance',
   };
 
-  const prompt = `You are an expert educational content creator specializing in ${learningLevel} education. ${levelGuidelines[learningLevel as keyof typeof levelGuidelines]}. Focus on clarity, accuracy, and engagement.
+  const systemPrompt = `You are an expert educational content creator specializing in ${learningLevel} education. ${levelGuidelines[learningLevel as keyof typeof levelGuidelines]}. Focus on clarity, accuracy, and engagement.`;
 
-Based on this research: ${researchData}
+  const prompt = `Based on this research: ${researchData}
 
 Create a comprehensive educational article about "${topic}".
 
@@ -47,14 +47,28 @@ Structure:
 Make it engaging, clear, and appropriate for ${learningLevel} level.`;
 
   try {
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const article = response.text();
+    const response = await groq.chat.completions.create({
+      model: 'llama-3.1-8b-instant', // FREE, fast, good quality
+      messages: [
+        {
+          role: 'system',
+          content: systemPrompt,
+        },
+        {
+          role: 'user',
+          content: prompt,
+        },
+      ],
+      temperature: 0.7,
+      max_tokens: 4000,
+    });
+
+    const article = response.choices[0].message.content || '';
 
     console.log(`✅ Article generated: ${article.length} characters`);
     return article;
   } catch (error: any) {
-    console.error('❌ Gemini article generation error:', error.message);
+    console.error('❌ Groq article generation error:', error.message);
     throw error;
   }
 }
@@ -69,8 +83,8 @@ export async function generateContentForQuery(queryId: string) {
 
   console.log(`📝 Generating content for query: ${queryId}`);
 
-  // Generate article with Gemini
-  const article = await generateArticleWithGemini(
+  // Generate article with Groq
+  const article = await generateArticleWithGroq(
     research.summary,
     research.query.queryText,
     research.query.complexityLevel || 'college'
@@ -85,94 +99,46 @@ export async function generateContentForQuery(queryId: string) {
     },
   });
 
-  console.log(`✅ Article created`);
+  console.log(`✅ Article content created: ${articleContent.id}`);
 
-  // Generate audio (async, non-blocking)
+  // Generate audio in background (non-blocking)
   if (process.env.ELEVENLABS_API_KEY) {
-    generateAudioAsync(
-      queryId, 
-      article, 
-      research.query.complexityLevel || 'college'
-    ).catch((error) => {
-      console.error('❌ Audio generation failed:', error.message);
+    generateAudioAsync(queryId, article).catch((error) => {
+      console.warn('⚠️ Audio generation skipped:', error.message);
     });
   } else {
-    console.warn('⚠️  ELEVENLABS_API_KEY not configured. Skipping audio generation.');
+    console.log('⚠️ ELEVENLABS_API_KEY not set, skipping audio generation');
   }
-
-  console.log('ℹ️  Video generation skipped - user must request manually');
 
   return articleContent;
 }
 
-async function generateAudioAsync(
-  queryId: string, 
-  fullText: string,
-  learningLevel: string
-) {
+async function generateAudioAsync(queryId: string, text: string) {
   try {
-    console.log('═══════════════════════════════════════════════');
-    console.log('🎤 STARTING AUDIO GENERATION');
-    console.log('═══════════════════════════════════════════════');
+    console.log(`🎵 Starting audio generation for query: ${queryId}`);
 
-    const audioText = await generateAudioSummary({
-      text: fullText,
-      maxDurationMinutes: 10,
-      learningLevel: learningLevel,
-    });
-
-    const estimatedDuration = estimateAudioDuration(audioText);
-    const wordCount = audioText.split(/\s+/).length;
-    
-    console.log(`✅ Audio summary: ${wordCount} words (~${Math.ceil(estimatedDuration / 60)} min)`);
-
-    console.log('🎤 Generating speech with ElevenLabs...');
-    
-    let audioBuffer: Buffer;
-    try {
-      audioBuffer = await generateSpeech({ text: audioText });
-      console.log(`✅ Audio generated: ${audioBuffer.length} bytes`);
-    } catch (speechError: any) {
-      console.error('❌ ElevenLabs error:', speechError.message);
-      
-      await prisma.content.create({
-        data: {
-          queryId,
-          contentType: 'audio',
-          title: 'Audio Generation Failed',
-          data: { error: speechError.message, status: 'failed' },
-        },
-      });
-      throw speechError;
-    }
-
+    const audioBuffer = await generateSpeech({ text });
     const audioDir = join(process.cwd(), 'public', 'audio');
-    if (!existsSync(audioDir)) await mkdir(audioDir, { recursive: true });
+    
+    if (!existsSync(audioDir)) {
+      await mkdir(audioDir, { recursive: true });
+    }
     
     const audioPath = join(audioDir, `${queryId}.mp3`);
     await writeFile(audioPath, audioBuffer);
-    console.log(`✅ Audio saved: ${audioPath}`);
 
     await prisma.content.create({
       data: {
         queryId,
         contentType: 'audio',
-        title: `Audio Summary`,
+        title: 'Audio Narration',
         storageUrl: `/audio/${queryId}.mp3`,
-        data: { 
-          duration: estimatedDuration,
-          wordCount: wordCount,
-          status: 'completed',
-        },
+        data: { duration: 0 },
       },
     });
 
-    console.log('═══════════════════════════════════════════════');
-    console.log(`✅ AUDIO GENERATION COMPLETED`);
-    console.log('═══════════════════════════════════════════════\n');
-
+    console.log(`✅ Audio generated: ${queryId}.mp3`);
   } catch (error: any) {
-    console.error('❌ AUDIO GENERATION FAILED:', error.message);
-    throw error;
+    console.error('❌ Audio generation failed:', error.message);
   }
 }

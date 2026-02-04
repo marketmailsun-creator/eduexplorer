@@ -1,8 +1,8 @@
 'use client';
 
 import { Card, CardContent } from '@/components/ui/card';
-import { useState } from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface Diagram {
@@ -10,7 +10,6 @@ interface Diagram {
   title: string;
   type: string;
   description: string;
-  imageUrl?: string;
   mermaidCode?: string;
 }
 
@@ -20,12 +19,47 @@ interface DiagramViewerProps {
 
 export function DiagramViewer({ diagrams }: DiagramViewerProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [renderedDiagrams, setRenderedDiagrams] = useState<Map<number, string>>(new Map());
+  const [loading, setLoading] = useState(false);
 
   if (!diagrams || diagrams.length === 0) {
     return null;
   }
 
   const currentDiagram = diagrams[currentIndex];
+
+  // Render Mermaid diagram using mermaid.ink API
+  useEffect(() => {
+    const renderDiagram = async () => {
+      if (!currentDiagram.mermaidCode || renderedDiagrams.has(currentDiagram.id)) {
+        return;
+      }
+
+      setLoading(true);
+      try {
+        // Use mermaid.ink API for rendering
+        const encoded = btoa(currentDiagram.mermaidCode);
+        const imageUrl = `https://mermaid.ink/img/${encoded}`;
+        
+        // Preload image to check if it works
+        const img = new Image();
+        img.onload = () => {
+          setRenderedDiagrams(prev => new Map(prev).set(currentDiagram.id, imageUrl));
+          setLoading(false);
+        };
+        img.onerror = () => {
+          console.error('Failed to load diagram:', currentDiagram.title);
+          setLoading(false);
+        };
+        img.src = imageUrl;
+      } catch (error) {
+        console.error('Error rendering diagram:', error);
+        setLoading(false);
+      }
+    };
+
+    renderDiagram();
+  }, [currentDiagram, renderedDiagrams]);
 
   const nextDiagram = () => {
     if (currentIndex < diagrams.length - 1) {
@@ -38,6 +72,8 @@ export function DiagramViewer({ diagrams }: DiagramViewerProps) {
       setCurrentIndex(prev => prev - 1);
     }
   };
+
+  const renderedUrl = renderedDiagrams.get(currentDiagram.id);
 
   return (
     <div className="space-y-4">
@@ -59,38 +95,41 @@ export function DiagramViewer({ diagrams }: DiagramViewerProps) {
             </p>
 
             {/* Diagram Image */}
-            <div className="bg-white border-2 border-gray-200 rounded-lg p-8 flex items-center justify-center min-h-[300px]">
-              {currentDiagram.imageUrl ? (
+            <div className="bg-white border-2 border-gray-200 rounded-lg p-8 flex items-center justify-center min-h-[400px]">
+              {loading ? (
+                <div className="flex flex-col items-center gap-4 text-gray-500">
+                  <Loader2 className="h-12 w-12 animate-spin" />
+                  <p>Rendering diagram...</p>
+                </div>
+              ) : renderedUrl ? (
                 <img
-                  src={currentDiagram.imageUrl}
+                  src={renderedUrl}
                   alt={currentDiagram.title}
                   className="max-w-full h-auto"
-                  onError={(e) => {
-                    // Fallback if image fails to load
-                    e.currentTarget.style.display = 'none';
-                    const parent = e.currentTarget.parentElement;
-                    if (parent) {
-                      parent.innerHTML = `<div class="text-center text-gray-500">
-                        <p class="text-lg font-semibold mb-2">${currentDiagram.title}</p>
-                        <p class="text-sm">${currentDiagram.description}</p>
-                        <pre class="mt-4 text-xs text-left bg-gray-50 p-4 rounded overflow-x-auto">${currentDiagram.mermaidCode || 'Diagram loading...'}</pre>
-                      </div>`;
-                    }
-                  }}
+                  style={{ maxHeight: '400px' }}
                 />
               ) : currentDiagram.mermaidCode ? (
-                <div className="text-center text-gray-600 max-w-2xl">
-                  <p className="text-lg font-semibold mb-2">{currentDiagram.title}</p>
-                  <p className="text-sm mb-4">{currentDiagram.description}</p>
-                  <pre className="text-xs text-left bg-gray-50 p-4 rounded overflow-x-auto border">
-                    {currentDiagram.mermaidCode}
-                  </pre>
+                <div className="w-full max-w-2xl">
+                  <div className="bg-gray-50 border rounded-lg p-6">
+                    <p className="text-sm font-semibold mb-3 text-gray-700">Diagram Code:</p>
+                    <pre className="text-xs text-gray-600 overflow-x-auto whitespace-pre-wrap break-words">
+                      {currentDiagram.mermaidCode}
+                    </pre>
+                  </div>
+                  <p className="text-xs text-center text-gray-500 mt-4">
+                    Visual rendering temporarily unavailable - showing code representation
+                  </p>
                 </div>
               ) : (
                 <div className="text-center text-gray-400">
-                  <p>Diagram visualization not available</p>
+                  <p>No diagram available</p>
                 </div>
               )}
+            </div>
+
+            {/* Help Text */}
+            <div className="text-xs text-center text-gray-500 bg-blue-50 p-3 rounded">
+              💡 Tip: Diagrams show key concepts and their relationships visually
             </div>
           </div>
         </CardContent>
@@ -144,56 +183,40 @@ export function DiagramViewer({ diagrams }: DiagramViewerProps) {
 }
 
 /**
- * Grid view - Shows all diagrams at once (alternative layout)
+ * Static SVG diagram generator (fallback)
  */
-export function DiagramGrid({ diagrams }: DiagramViewerProps) {
-  if (!diagrams || diagrams.length === 0) {
-    return null;
-  }
+export function generateSimpleSVG(
+  title: string,
+  nodes: Array<{ label: string; x: number; y: number }>,
+  links: Array<{ from: number; to: number }>
+): string {
+  const width = 800;
+  const height = 400;
 
-  return (
-    <div className="grid md:grid-cols-2 gap-4">
-      {diagrams.map((diagram) => (
-        <Card key={diagram.id} className="overflow-hidden">
-          <CardContent className="p-4">
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <h4 className="font-semibold text-sm">{diagram.title}</h4>
-                <span className="text-xs px-2 py-1 bg-blue-50 rounded">
-                  {diagram.type}
-                </span>
-              </div>
-              
-              <p className="text-xs text-muted-foreground">
-                {diagram.description}
-              </p>
-
-              <div className="bg-white border rounded p-4 min-h-[200px] flex items-center justify-center">
-                {diagram.imageUrl ? (
-                  <img
-                    src={diagram.imageUrl}
-                    alt={diagram.title}
-                    className="max-w-full h-auto"
-                    onError={(e) => {
-                      e.currentTarget.style.display = 'none';
-                    }}
-                  />
-                ) : (
-                  <div className="text-xs text-gray-400 text-center">
-                    {diagram.mermaidCode ? (
-                      <pre className="text-left overflow-x-auto">
-                        {diagram.mermaidCode.substring(0, 100)}...
-                      </pre>
-                    ) : (
-                      'Diagram not available'
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      ))}
-    </div>
-  );
+  let svg = `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">`;
+  
+  // Background
+  svg += `<rect width="${width}" height="${height}" fill="#f8fafc"/>`;
+  
+  // Draw links
+  links.forEach(link => {
+    const from = nodes[link.from];
+    const to = nodes[link.to];
+    if (from && to) {
+      svg += `<line x1="${from.x}" y1="${from.y}" x2="${to.x}" y2="${to.y}" stroke="#64748b" stroke-width="2" marker-end="url(#arrowhead)"/>`;
+    }
+  });
+  
+  // Arrow marker
+  svg += `<defs><marker id="arrowhead" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto"><polygon points="0 0, 10 3, 0 6" fill="#64748b"/></marker></defs>`;
+  
+  // Draw nodes
+  nodes.forEach((node, index) => {
+    const color = index === 0 ? '#60a5fa' : '#4ade80';
+    svg += `<rect x="${node.x - 60}" y="${node.y - 20}" width="120" height="40" fill="${color}" rx="8" stroke="white" stroke-width="2"/>`;
+    svg += `<text x="${node.x}" y="${node.y + 5}" text-anchor="middle" fill="white" font-size="14" font-weight="bold">${node.label}</text>`;
+  });
+  
+  svg += '</svg>';
+  return svg;
 }

@@ -40,3 +40,9 @@ prisma/dev.db-journal
 # docker
 postgres_data
 redis_data
+
+# audio files
+/public/audio/*.mp3
+
+# video files
+/public/video/*.mp4

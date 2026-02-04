@@ -32,6 +32,17 @@ interface PresentationViewerProps {
   autoPlay?: boolean;
 }
 
+function ensureArray(content: any): string[] {
+  if (!content) return [];
+  if (Array.isArray(content)) return content;
+  if (typeof content === 'string') return [content];
+  if (typeof content === 'object') {
+    if (content.text) return [content.text];
+    if (content.items && Array.isArray(content.items)) return content.items;
+  }
+  return [];
+}
+
 export function PresentationViewer({ presentationData, autoPlay = false }: PresentationViewerProps) {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isPlaying, setIsPlaying] = useState(autoPlay);
@@ -232,7 +243,7 @@ function SlideRenderer({ slide }: { slide: PresentationSlide }) {
             {slide.title}
           </h2>
           <ul className="space-y-4 md:space-y-6">
-            {slide.points?.map((point, index) => (
+            {ensureArray(slide.points).map((point, index) => (
               <li
                 key={index}
                 className="flex items-start gap-3 md:gap-4 text-xl md:text-2xl animate-fade-in"
@@ -280,7 +291,7 @@ function SlideRenderer({ slide }: { slide: PresentationSlide }) {
                 {slide.leftTitle || 'Left'}
               </h3>
               <ul className="space-y-3">
-                {slide.leftContent?.map((item, index) => (
+                {ensureArray(slide.leftContent).map((item, index) => (
                   <li key={index} className="flex items-start gap-2 text-lg md:text-xl">
                     <span className="text-blue-300 flex-shrink-0">•</span>
                     <span>{item}</span>
@@ -294,7 +305,7 @@ function SlideRenderer({ slide }: { slide: PresentationSlide }) {
                 {slide.rightTitle || 'Right'}
               </h3>
               <ul className="space-y-3">
-                {slide.rightContent?.map((item, index) => (
+               {ensureArray(slide.rightContent).map((item, index) => (
                   <li key={index} className="flex items-start gap-2 text-lg md:text-xl">
                     <span className="text-purple-300 flex-shrink-0">•</span>
                     <span>{item}</span>

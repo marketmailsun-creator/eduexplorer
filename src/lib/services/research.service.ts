@@ -1,12 +1,14 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import OpenAI from 'openai';
 import { prisma } from '../db/prisma';
 import { cacheGet, cacheSet } from '../db/redis';
 
-const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
-const genAI = GOOGLE_API_KEY ? new GoogleGenerativeAI(GOOGLE_API_KEY) : null;
+// Initialize Perplexity client
+const perplexity = new OpenAI({
+  apiKey: process.env.PERPLEXITY_API_KEY!,
+  baseURL: 'https://api.perplexity.ai',
+});
 
-console.log('🔑 Research Service - API Key Status:');
-console.log('  - GOOGLE_API_KEY:', GOOGLE_API_KEY ? '✅ SET' : '❌ MISSING');
+console.log('🔑 Research Service - Perplexity API:', process.env.PERPLEXITY_API_KEY ? '✅ SET' : '❌ MISSING');
 
 export async function processResearchQuery(
   userId: string,
@@ -14,15 +16,15 @@ export async function processResearchQuery(
   learningLevel: string
 ) {
   const cacheKey = `research:${queryText}:${learningLevel}`;
-  const cached = await cacheGet(cacheKey);
   
+  // Check cache first
+  const cached = await cacheGet(cacheKey);
   if (cached) {
-    console.log('✅ Returning cached research');
+    console.log('✅ Cache hit - using cached research');
     return { ...cached, fromCache: true };
   }
 
-  console.log('📝 Creating new research query...');
-  
+  // Create query record
   const query = await prisma.query.create({
     data: {
       userId,
@@ -33,107 +35,110 @@ export async function processResearchQuery(
   });
 
   try {
-    console.log('🔍 Researching topic with Google Gemini...');
-    const result = await researchTopicWithGemini(queryText, learningLevel);
+    console.log('🔍 Perplexity research started:', queryText);
+    console.log('  - Level:', learningLevel);
 
+    // Call Perplexity API with web search
+    const response = await perplexity.chat.completions.create({
+      model: 'sonar', // Fast, cheap, good quality
+      messages: [
+        {
+          role: 'system',
+          content: getSystemPrompt(learningLevel),
+        },
+        {
+          role: 'user',
+          content: queryText,
+        },
+      ],
+      temperature: 0.2,
+      max_tokens: 4000,
+    });
+
+    const content = response.choices[0].message.content || '';
+    const citations = (response as any).citations || [];
+
+    console.log('✅ Perplexity research completed:');
+    console.log('  - Content length:', content.length, 'characters');
+    console.log('  - Citations:', citations.length);
+
+    // Format sources from citations
+    const sources = citations.map((url: string, idx: number) => ({
+      title: `Source ${idx + 1}`,
+      url,
+      snippet: url,
+    }));
+
+    // Save research data to database
     await prisma.researchData.create({
       data: {
         queryId: query.id,
-        rawData: result as any,
-        sources: result.sources as any,
-        summary: result.content.substring(0, 500),
+        rawData: {
+          content,
+          citations,
+          model: 'perplexity-sonar',
+        } as any,
+        sources: sources as any,
+        summary: content.substring(0, 500),
       },
     });
 
+    // Update query status
     await prisma.query.update({
       where: { id: query.id },
       data: {
         status: 'completed',
-        topicDetected: result.topic,
+        topicDetected: queryText,
       },
     });
 
-    const response = { queryId: query.id, ...result };
-    await cacheSet(cacheKey, response, 86400);
+    const result = {
+      queryId: query.id,
+      content,
+      sources,
+      topic: queryText,
+      complexity: learningLevel,
+    };
 
-    console.log('✅ Research completed');
-    return response;
-  } catch (error) {
-    console.error('❌ Research failed:', error);
+    // Cache for 24 hours
+    await cacheSet(cacheKey, result, 86400);
+
+    console.log('💾 Research cached for 24 hours');
+
+    return result;
+  } catch (error: any) {
+    console.error('❌ Perplexity research error:', error);
+    console.error('  - Message:', error.message);
+    
     await prisma.query.update({
       where: { id: query.id },
       data: { status: 'failed' },
     });
-    throw error;
+    
+    throw new Error(`Research failed: ${error.message}`);
   }
 }
 
-async function researchTopicWithGemini(
-  query: string,
-  learningLevel: string = 'college'
-): Promise<any> {
-  if (!genAI) {
-    throw new Error('GOOGLE_API_KEY not configured');
-  }
+function getSystemPrompt(level: string): string {
+  const guidelines = {
+    elementary: 'Use simple language, short sentences, and lots of examples. Explain as if teaching a 10-year-old.',
+    'high-school': 'Balance accessibility with depth. Introduce technical terms but explain them clearly.',
+    college: 'Academic rigor with proper citations. Use domain-specific terminology.',
+    adult: 'Professional tone with practical applications. Focus on career relevance.',
+  };
 
-  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+  const levelGuideline = guidelines[level as keyof typeof guidelines] || guidelines.college;
 
-  const prompt = `You are an educational research assistant. Explain this topic: "${query}"
+  return `You are an expert educational researcher specializing in ${level} level education.
 
-Target audience: ${learningLevel} level students
+${levelGuideline}
 
-Provide a comprehensive explanation covering:
-1. Core concepts and definitions
-2. Key principles and theories
-3. Real-world applications
-4. Common misconceptions
-5. Related topics for further study
+Provide:
+1. Clear, comprehensive explanation
+2. Break down complex concepts
+3. Include examples and applications
+4. Use accurate, up-to-date information
+5. Include citations naturally
 
-Make it clear, accurate, and engaging for ${learningLevel} level.`;
-
-  try {
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const content = response.text();
-
-    console.log(`✅ Research content generated: ${content.length} characters`);
-
-    // Extract any URLs mentioned as sources (simplified)
-    const sources = extractSourcesFromContent(content);
-
-    return {
-      content,
-      sources,
-      topic: query,
-      complexity: learningLevel,
-    };
-  } catch (error: any) {
-    console.error('❌ Gemini research error:', error.message);
-    throw error;
-  }
-}
-
-function extractSourcesFromContent(content: string): Array<{ title: string; url: string; snippet: string }> {
-  const sources: Array<{ title: string; url: string; snippet: string }> = [];
-  const urlRegex = /(https?:\/\/[^\s]+)/g;
-  const urls = content.match(urlRegex) || [];
-  
-  urls.forEach((url, index) => {
-    sources.push({
-      title: `Reference ${index + 1}`,
-      url,
-      snippet: 'Source referenced in research',
-    });
-  });
-
-  // If no URLs found, add a generic educational source reference
-  if (sources.length === 0) {
-    sources.push({
-      title: 'Generated with Google Gemini',
-      url: 'https://ai.google.dev/',
-      snippet: 'Educational content generated by AI',
-    });
-  }
-
-  return sources;
+Focus on educational content that is accurate and engaging.`;
 }
