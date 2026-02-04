@@ -63,43 +63,48 @@ Be concise but comprehensive.`,
  */
 export async function transcribeAudio(audioBuffer: Buffer): Promise<string> {
   // Option 1: Use OpenAI Whisper API (if you have API key)
-  if (process.env.OPENAI_API_KEY) {
-    return await transcribeWithWhisper(audioBuffer);
-  }
+  // if (process.env.OPENAI_API_KEY) {
+  //   return await transcribeWithWhisper(audioBuffer);
+  // }
 
   // Option 2: Use Web Speech API transcription (client-side)
   // This is a fallback - implement client-side transcription
-  console.warn('Audio transcription requires OpenAI API key');
-  return '[Audio recording attached - transcription not available]';
+  // console.warn('Audio transcription requires OpenAI API key');
+  // return '[Audio recording attached - transcription not available]';
+
+  console.log('Audio transcription is currently disabled');
+  return '[Audio recording received - transcription not available yet]';
 }
 
 /**
  * Transcribe audio using OpenAI Whisper API
  */
-async function transcribeWithWhisper(audioBuffer: Buffer): Promise<string> {
-  try {
-    const formData = new FormData();
-    const audioBlob = new Blob([audioBuffer], { type: 'audio/webm' });
-    formData.append('file', audioBlob, 'audio.webm');
-    formData.append('model', 'whisper-1');
+// async function transcribeWithWhisper(audioBuffer: Buffer): Promise<string> {
+//   try {
+//     const formData = new FormData();
+//     // Convert Buffer to Uint8Array for Blob compatibility
+//     const uint8Array = new Uint8Array(audioBuffer.buffer, audioBuffer.byteOffset, audioBuffer.byteLength);
+//     const audioBlob = new Blob([uint8Array], { type: 'audio/webm' });
+//         formData.append('file', audioBlob, 'audio.webm');
+//     formData.append('model', 'whisper-1');
 
-    const response = await axios.post(
-      'https://api.openai.com/v1/audio/transcriptions',
-      formData,
-      {
-        headers: {
-          'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
-          'Content-Type': 'multipart/form-data',
-        },
-      }
-    );
+//     const response = await axios.post(
+//       'https://api.openai.com/v1/audio/transcriptions',
+//       formData,
+//       {
+//         headers: {
+//           'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+//           'Content-Type': 'multipart/form-data',
+//         },
+//       }
+//     );
 
-    return response.data.text;
-  } catch (error) {
-    console.error('Whisper transcription error:', error);
-    return '[Audio transcription failed]';
-  }
-}
+//     return response.data.text;
+//   } catch (error) {
+//     console.error('Whisper transcription error:', error);
+//     return '[Audio transcription failed]';
+//   }
+// }
 
 /**
  * Extract text from PDF documents
