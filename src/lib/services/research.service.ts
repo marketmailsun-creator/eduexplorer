@@ -1,6 +1,7 @@
 import OpenAI from 'openai';
 import { prisma } from '../db/prisma';
 import { cacheGet, cacheSet } from '../db/redis';
+import { formatForDisplay } from '../utils/text-cleaning-utils';
 
 // Initialize Perplexity client
 const perplexity = new OpenAI({
@@ -48,7 +49,7 @@ export async function processResearchQuery(
         },
         {
           role: 'user',
-          content: queryText,
+          content: formatForDisplay(queryText),
         },
       ],
       temperature: 0.2,
@@ -57,7 +58,7 @@ export async function processResearchQuery(
 
     const content = response.choices[0].message.content || '';
     const citations = (response as any).citations || [];
-
+    const cleanedContent = formatForDisplay(content);
     console.log('✅ Perplexity research completed:');
     console.log('  - Content length:', content.length, 'characters');
     console.log('  - Citations:', citations.length);
@@ -74,12 +75,12 @@ export async function processResearchQuery(
       data: {
         queryId: query.id,
         rawData: {
-          content,
+          cleanedContent,
           citations,
           model: 'perplexity-sonar',
         } as any,
         sources: sources as any,
-        summary: content.substring(0, 500),
+        summary: cleanedContent.substring(0, 500),
       },
     });
 

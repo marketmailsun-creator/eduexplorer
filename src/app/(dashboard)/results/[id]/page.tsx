@@ -85,37 +85,37 @@ export default async function ResultsPage({
   console.log('  - Quiz:', hasQuiz ? 'cached' : 'not generated');
 
   // ✅ Generate and CACHE quiz if not exists
-  let quiz = hasQuiz ? quizData.quiz : null;
-  if (!quiz && articleText) {
-    try {
-      console.log('🎯 Generating quiz on server...');
-      quiz = await generatePracticeQuestions(query.queryText, articleText, 10);
-      console.log('✅ Quiz generated on server:', quiz.questions.length, 'questions');
+   let quiz = hasQuiz ? quizData.quiz : null;
+  // if (!quiz && articleText) {
+  //   try {
+  //     console.log('🎯 Generating quiz on server...');
+  //     quiz = await generatePracticeQuestions(query.queryText, articleText, 10);
+  //     console.log('✅ Quiz generated on server:', quiz.questions.length, 'questions');
 
-      // ✅ SAVE QUIZ TO DATABASE (so it's cached)
-      await prisma.content.create({
-        data: {
-          queryId: id,
-          contentType: 'quiz',
-          title: `${query.queryText} - Practice Quiz`,
-          data: {
-            status: 'completed',
-            quiz: quiz as Prisma.InputJsonValue,
-          } as Prisma.InputJsonValue,
-        },
-      });
-      console.log('💾 Quiz saved to database for future use');
-    } catch (error) {
-      console.error('❌ Quiz generation failed:', error);
-    }
-  }
+  //     // ✅ SAVE QUIZ TO DATABASE (so it's cached)
+  //     await prisma.content.create({
+  //       data: {
+  //         queryId: id,
+  //         contentType: 'quiz',
+  //         title: `${query.queryText} - Practice Quiz`,
+  //         data: {
+  //           status: 'completed',
+  //           quiz: quiz as Prisma.InputJsonValue,
+  //         } as Prisma.InputJsonValue,
+  //       },
+  //     });
+  //     console.log('💾 Quiz saved to database for future use');
+  //   } catch (error) {
+  //     console.error('❌ Quiz generation failed:', error);
+  //   }
+  // }
 
   // Generate concept map data on server (only if we have article)
-  let conceptMapData = null;
-  if (articleText) {
-    const keyPoints = extractKeyPoints(articleText, 6);
-    conceptMapData = generateConceptMapData(query.queryText, keyPoints);
-  }
+   let conceptMapData = null;
+  // if (articleText) {
+  //   const keyPoints = extractKeyPoints(articleText, 6);
+  //   conceptMapData = generateConceptMapData(query.queryText, keyPoints);
+  // }
 
   // Get clean text for display
   const rawText = article?.text || (query.researchData as any)?.rawData?.content || '';

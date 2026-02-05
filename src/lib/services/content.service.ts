@@ -4,6 +4,7 @@ import { prisma } from '../db/prisma';
 import { writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
 import { existsSync } from 'fs';
+import { formatForDisplay } from '../utils/text-formatter';
 
 // Use Groq (OpenAI-compatible API)
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
@@ -89,26 +90,26 @@ export async function generateContentForQuery(queryId: string) {
     research.query.queryText,
     research.query.complexityLevel || 'college'
   );
-
+ const cleanedArticle = formatForDisplay(article);
   const articleContent = await prisma.content.create({
     data: {
       queryId,
       contentType: 'article',
       title: research.query.queryText,
-      data: { text: article },
+      data: { text: cleanedArticle },
     },
   });
 
   console.log(`✅ Article content created: ${articleContent.id}`);
 
   // Generate audio in background (non-blocking)
-  if (process.env.ELEVENLABS_API_KEY) {
-    generateAudioAsync(queryId, article).catch((error) => {
-      console.warn('⚠️ Audio generation skipped:', error.message);
-    });
-  } else {
-    console.log('⚠️ ELEVENLABS_API_KEY not set, skipping audio generation');
-  }
+  // if (process.env.ELEVENLABS_API_KEY) {
+  //   generateAudioAsync(queryId, article).catch((error) => {
+  //     console.warn('⚠️ Audio generation skipped:', error.message);
+  //   });
+  // } else {
+  //   console.log('⚠️ ELEVENLABS_API_KEY not set, skipping audio generation');
+  // }
 
   return articleContent;
 }

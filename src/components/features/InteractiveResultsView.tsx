@@ -30,6 +30,7 @@ import { GenerateAudioButton } from './GenerateAudioButton';
 import jsPDF from 'jspdf';
 //import { InteractiveConceptMapClickable } from './InteractiveConceptMap';
 import { EnhancedConceptMap } from './EnhancedConceptMap';
+import { GenerateQuizButton } from './GenerateQuizButton';
 
 interface InteractiveResultsViewProps {
   query: any;
@@ -511,7 +512,8 @@ export function InteractiveResultsView({
               ) : (
                 <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed">
                   <Brain className="h-16 w-16 mx-auto mb-4 text-gray-400" />
-                  <p className="text-gray-600 mb-6">Quiz is being generated...</p>
+                  <p className="text-gray-600 mb-6">Test your knowledge with a practice quiz</p>
+                  <GenerateQuizButton queryId={queryId} />
                 </div>
               )}
             </CardContent>

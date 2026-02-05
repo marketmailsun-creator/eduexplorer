@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { cleanForJSON } from '../utils/text-cleaning-utils';
 
 const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
 const genAI = GOOGLE_API_KEY ? new GoogleGenerativeAI(GOOGLE_API_KEY) : null;
@@ -30,7 +31,9 @@ export async function generatePracticeQuestions(
   count: number = 10,
   level: string = 'college'
 ): Promise<PracticeQuiz> {
-  
+
+  const cleanedText = cleanForJSON(articleText);
+
   if (!genAI) {
     console.warn('⚠️ GOOGLE_API_KEY not set, using fallback');
     return generateFallbackQuestions(topic, articleText, count, level);
@@ -48,7 +51,7 @@ export async function generatePracticeQuestions(
   const prompt = `Create ${count} practice questions about "${topic}" for ${level} level students.
 
 Content to base questions on:
-${articleText.substring(0, 4000)}
+${cleanedText.substring(0, 4000)}
 
 Generate diverse question types:
 - Multiple choice (4 options, 1 correct)
