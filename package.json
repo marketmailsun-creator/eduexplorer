@@ -37,6 +37,7 @@
     "@radix-ui/react-toast": "^1.2.15",
     "@remotion/bundler": "^4.0.414",
     "@remotion/renderer": "^4.0.414",
+    "@upstash/redis": "^1.36.2",
     "axios": "^1.13.2",
     "bcryptjs": "^3.0.3",
     "bullmq": "^5.67.2",
