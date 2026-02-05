@@ -57,7 +57,9 @@ export default async function ResultsPage({
   const flashcardContent = query.content.find((c) => c.contentType === 'flashcards');
   const diagramContent = query.content.find((c) => c.contentType === 'diagrams');
   const quizContent = query.content.find((c) => c.contentType === 'quiz');
-
+  const conceptMapContent = query.content.find((c) => c.contentType === 'concept-map');
+  
+  const conceptMapData = conceptMapContent?.data || null;
   const article = articleContent?.data as any;
   const articleText = (article?.text as string) || (query.researchData as any)?.rawData?.content || '';
 
@@ -111,7 +113,7 @@ export default async function ResultsPage({
   // }
 
   // Generate concept map data on server (only if we have article)
-   let conceptMapData = null;
+  // let conceptMapData = null;
   // if (articleText) {
   //   const keyPoints = extractKeyPoints(articleText, 6);
   //   conceptMapData = generateConceptMapData(query.queryText, keyPoints);

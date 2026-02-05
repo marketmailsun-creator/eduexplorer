@@ -31,6 +31,7 @@ import jsPDF from 'jspdf';
 //import { InteractiveConceptMapClickable } from './InteractiveConceptMap';
 import { EnhancedConceptMap } from './EnhancedConceptMap';
 import { GenerateQuizButton } from './GenerateQuizButton';
+import { GenerateConceptMapButton } from './GenerateConceptMapButton';
 
 interface InteractiveResultsViewProps {
   query: any;
@@ -391,15 +392,19 @@ export function InteractiveResultsView({
               </div>
             </CardHeader>
             {conceptMapSize !== 'minimized' && (
-              <CardContent>
-                {/* <InteractiveConceptMapClickable
-                  data={conceptMapData}
-                  articleText={articleText}
-                /> */}
-                <EnhancedConceptMap 
+             <CardContent>
+                {conceptMapData ? (
+                  <EnhancedConceptMap 
                     data={conceptMapData}
                     articleText={articleText}
-                    />
+                  />
+                ) : (
+                  <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed">
+                    <Network className="h-16 w-16 mx-auto mb-4 text-gray-400" />
+                    <p className="text-gray-600 mb-6">Generate an interactive concept map</p>
+                    <GenerateConceptMapButton queryId={queryId} />
+                  </div>
+                )}
               </CardContent>
             )}
           </Card>

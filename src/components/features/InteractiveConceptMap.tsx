@@ -4,6 +4,7 @@ import { useState, useRef } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ZoomIn, ZoomOut, RotateCcw, X } from 'lucide-react';
+import { GenerateConceptMapButton } from './GenerateConceptMapButton';
 
 interface ConceptNode {
   id: string;
