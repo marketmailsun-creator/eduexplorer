@@ -1,6 +1,6 @@
 import { researchTopic } from '../api/claude';
 import { prisma } from '../db/prisma';
-import { cacheGet, cacheSet } from '../db/redis';
+import { getCached, setCache } from '../db/redis';
 
 export async function processResearchQuery(
   userId: string,
@@ -8,7 +8,7 @@ export async function processResearchQuery(
   learningLevel: string
 ) {
   const cacheKey = `research:${queryText}:${learningLevel}`;
-  const cached = await cacheGet(cacheKey);
+  const cached = await getCached(cacheKey);
   
   if (cached) {
     return { ...cached, fromCache: true };
@@ -44,7 +44,7 @@ export async function processResearchQuery(
     });
 
     const response = { queryId: query.id, ...result };
-    await cacheSet(cacheKey, response, 86400);
+    await setCache(cacheKey, response, 86400);
 
     return response;
   } catch (error) {

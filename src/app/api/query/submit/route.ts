@@ -72,7 +72,11 @@ export async function POST(req: NextRequest) {
     }
 
     // Process the query
-    const result = await processResearchQuery(session.user.id, query, learningLevel);
+    const result = await processResearchQuery({
+      userId: session.user.id,
+      queryText: query,
+      learningLevel,
+     });
 
     // Generate content asynchronously
     //generateContentForQuery(result.queryId).catch(console.error);

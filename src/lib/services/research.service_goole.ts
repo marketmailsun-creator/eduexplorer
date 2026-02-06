@@ -1,6 +1,6 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { prisma } from '../db/prisma';
-import { cacheGet, cacheSet } from '../db/redis';
+import { getCached, setCache } from '../db/redis';
 
 const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
 const genAI = GOOGLE_API_KEY ? new GoogleGenerativeAI(GOOGLE_API_KEY) : null;
@@ -14,7 +14,7 @@ export async function processResearchQuery(
   learningLevel: string
 ) {
   const cacheKey = `research:${queryText}:${learningLevel}`;
-  const cached = await cacheGet(cacheKey);
+  const cached = await getCached(cacheKey);
   
   if (cached) {
     console.log('✅ Returning cached research');
@@ -54,7 +54,7 @@ export async function processResearchQuery(
     });
 
     const response = { queryId: query.id, ...result };
-    await cacheSet(cacheKey, response, 86400);
+    await setCache(cacheKey, response, 86400);
 
     console.log('✅ Research completed');
     return response;

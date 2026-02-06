@@ -1,7 +1,16 @@
 import OpenAI from 'openai';
 import { prisma } from '../db/prisma';
-import { cacheGet, cacheSet } from '../db/redis';
 import { formatForDisplay } from '../utils/text-cleaning-utils';
+import { getCached, setCache } from '../db/redis';
+
+interface ResearchResult {
+  queryId: string;
+  content: string;
+  sources: any[];
+  topic: string;
+  complexity: string;
+  fromCache?: boolean;
+}
 
 // Initialize Perplexity client
 const perplexity = new OpenAI({
@@ -11,21 +20,39 @@ const perplexity = new OpenAI({
 
 console.log('🔑 Research Service - Perplexity API:', process.env.PERPLEXITY_API_KEY ? '✅ SET' : '❌ MISSING');
 
-export async function processResearchQuery(
-  userId: string,
-  queryText: string,
-  learningLevel: string
-) {
-  const cacheKey = `research:${queryText}:${learningLevel}`;
+export async function processResearchQuery(params: {
+  userId: string;
+  queryText: string;
+  learningLevel: string;
+}): Promise<ResearchResult> {
   
+  const { userId, queryText, learningLevel } = params;
+
+  console.log('Processing research query:', { userId, queryText, learningLevel });
   // Check cache first
-  const cached = await cacheGet(cacheKey);
+  const cacheKey = `research:${userId}:${queryText}:${learningLevel}`;
+  const cached = await getCached<ResearchResult>(cacheKey);
+  
   if (cached) {
-    console.log('✅ Cache hit - using cached research');
-    return { ...cached, fromCache: true };
+    console.log('✓ Research loaded from cache');
+    return {
+      ...cached,
+      fromCache: true,
+    };
   }
 
-  // Create query record
+  console.log('✗ Cache miss, generating new research');
+
+  // Verify user exists
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+  });
+
+  if (!user) {
+    throw new Error(`User not found: ${userId}`);
+  }
+
+  // Create query record 
   const query = await prisma.query.create({
     data: {
       userId,
@@ -34,6 +61,7 @@ export async function processResearchQuery(
       status: 'processing',
     },
   });
+  console.log('✓ Query created:', query.id);
 
   try {
     console.log('🔍 Perplexity research started:', queryText);
@@ -93,16 +121,18 @@ export async function processResearchQuery(
       },
     });
 
-    const result = {
+    // Prepare result
+    const result: ResearchResult = {
       queryId: query.id,
-      content,
-      sources,
+      content: cleanedContent,
+      sources: sources,
       topic: queryText,
       complexity: learningLevel,
+      fromCache: false,
     };
 
     // Cache for 24 hours
-    await cacheSet(cacheKey, result, 86400);
+    await setCache(cacheKey, result, 86400);
 
     console.log('💾 Research cached for 24 hours');
 
