@@ -7,6 +7,7 @@ import { writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
 import { existsSync } from 'fs';
 import { z } from 'zod';
+import { uploadAudio } from '@/lib/storage/r2';
 
 const audioSchema = z.object({
   contentId: z.string(),
@@ -93,15 +94,20 @@ export async function POST(req: NextRequest) {
     });
 
     // Save audio file
-    const audioDir = join(process.cwd(), 'public', 'audio');
-    if (!existsSync(audioDir)) {
-      await mkdir(audioDir, { recursive: true });
-    }
+    // const audioDir = join(process.cwd(), 'public', 'audio');
+    // if (!existsSync(audioDir)) {
+    //   await mkdir(audioDir, { recursive: true });
+    // }
 
     const timestamp = Date.now();
     const filename = `${queryId}-${timestamp}.mp3`;
-    const audioPath = join(audioDir, filename);
-    await writeFile(audioPath, audioBuffer);
+    //const audioPath = join(audioDir, filename);
+    //await writeFile(audioPath, audioBuffer);
+
+    // Upload to R2
+    //const filename = `${queryId}-${Date.now()}.mp3`;
+    const publicUrl = await uploadAudio(filename, audioBuffer);
+    console.log('✓ Audio uploaded:', publicUrl);
 
     // Create audio content record
     const audioContent = await prisma.content.create({
@@ -109,7 +115,7 @@ export async function POST(req: NextRequest) {
         queryId: queryId,
         contentType: 'audio',
         title: `${content.title} - Audio`,
-        storageUrl: `/audio/${filename}`,
+        storageUrl: publicUrl,
         data: { 
           duration: 0, 
           originalContentId: contentId,
@@ -122,7 +128,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      audioUrl: `/audio/${filename}`,
+      audioUrl: publicUrl,
       audioContent,
       truncated: text.length > maxLength,
     });
