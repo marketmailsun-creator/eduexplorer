@@ -34,10 +34,7 @@ export function AudioPlayerSection({ audioContent, queryId }: AudioPlayerSection
     const audio = audioRef.current;
     if (!audio || !audioUrl) return;
 
-    console.log('🎵 AudioPlayer mounted with URL:', audioUrl);
-
     const handleLoadedMetadata = () => {
-      console.log('✅ Audio metadata loaded, duration:', audio.duration);
       setDuration(audio.duration);
       setIsReady(true);
       setError(null);
@@ -47,31 +44,19 @@ export function AudioPlayerSection({ audioContent, queryId }: AudioPlayerSection
       setCurrentTime(audio.currentTime);
     };
 
-    const handlePlay = () => {
-      console.log('▶️ Audio playing');
-      setIsPlaying(true);
-      setError(null);
-    };
-
-    const handlePause = () => {
-      console.log('⏸️ Audio paused');
-      setIsPlaying(false);
-    };
-
+    const handlePlay = () => setIsPlaying(true);
+    const handlePause = () => setIsPlaying(false);
     const handleEnded = () => {
-      console.log('⏹️ Audio ended');
       setIsPlaying(false);
       setCurrentTime(0);
     };
 
-    const handleError = (e: Event) => {
-      console.error('❌ Audio error:', e);
+    const handleError = () => {
       setError('Audio file unavailable');
       setIsReady(false);
     };
 
     const handleCanPlay = () => {
-      console.log('✅ Audio can play');
       setIsReady(true);
       setError(null);
     };
@@ -104,29 +89,18 @@ export function AudioPlayerSection({ audioContent, queryId }: AudioPlayerSection
     setError(null);
     
     try {
-      console.log('🔄 Regenerating audio for query:', queryId);
-      
-      const response = await fetch('/api/content/audio', {
+      const response = await fetch('/api/content/audio/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          queryId,
-          regenerate: true,
-        }),
+        body: JSON.stringify({ queryId }),
       });
 
-      const data = await response.json();
-
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to generate audio');
+        throw new Error('Failed to generate audio');
       }
 
-      console.log('✅ Audio regenerated successfully');
-      
-      // Reload the page to get new audio
       window.location.reload();
     } catch (err) {
-      console.error('❌ Audio regeneration error:', err);
       setError(err instanceof Error ? err.message : 'Failed to generate audio');
     } finally {
       setIsGenerating(false);
@@ -247,160 +221,153 @@ export function AudioPlayerSection({ audioContent, queryId }: AudioPlayerSection
   }
 
   return (
-    <Card className="w-full">
-      <CardHeader className="pb-3">
-        <CardTitle className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-base">
-            <Volume2 className="h-4 w-4" />
-            Audio Narration
-          </div>
+    <div className="w-full space-y-3 sm:space-y-4">
+      <audio ref={audioRef} src={audioUrl} preload="metadata" />
+
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-xs flex items-center justify-between">
+          <span>{error}</span>
           {queryId && (
             <Button
               onClick={handleRegenerateAudio}
               disabled={isGenerating}
               size="sm"
               variant="ghost"
-              className="h-7 text-xs"
+              className="h-6 text-xs"
             >
-              {isGenerating ? (
-                <RefreshCw className="h-3 w-3 animate-spin" />
-              ) : (
-                <RefreshCw className="h-3 w-3" />
-              )}
+              Retry
             </Button>
           )}
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <audio ref={audioRef} src={audioUrl} preload="metadata" />
+        </div>
+      )}
 
-        {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded text-xs flex items-center justify-between">
-            <span>{error}</span>
-            {queryId && (
-              <Button
-                onClick={handleRegenerateAudio}
-                disabled={isGenerating}
-                size="sm"
-                variant="ghost"
-                className="h-6 text-xs"
-              >
-                Retry
-              </Button>
-            )}
-          </div>
-        )}
-
-        {/* Progress Bar */}
-        <div className="space-y-1.5">
-          <div className="relative">
-            <input
-              type="range"
-              min="0"
-              max={duration || 0}
-              value={currentTime}
-              onChange={handleSeek}
-              disabled={!isReady}
-              className="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
-              style={{
-                background: isReady
-                  ? `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${progress}%, #e5e7eb ${progress}%, #e5e7eb 100%)`
-                  : '#e5e7eb'
-              }}
-            />
-          </div>
+      {/* Modern Progress Bar with Waveform Style */}
+      <div className="space-y-2">
+        <div className="relative h-2 bg-gray-200 rounded-full overflow-hidden group">
+          {/* Progress fill with gradient */}
+          <div 
+            className="absolute inset-y-0 left-0 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full transition-all duration-150"
+            style={{ width: `${progress}%` }}
+          />
           
-          <div className="flex justify-between text-xs text-gray-600">
-            <span>{formatTime(currentTime)}</span>
-            <span>{isReady ? formatTime(duration) : '--:--'}</span>
+          {/* Interactive slider */}
+          <input
+            type="range"
+            min="0"
+            max={duration || 0}
+            value={currentTime}
+            onChange={handleSeek}
+            disabled={!isReady}
+            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed z-10"
+          />
+          
+          {/* Hover indicator */}
+          <div 
+            className="absolute inset-y-0 left-0 pointer-events-none"
+            style={{ width: `${progress}%` }}
+          >
+            <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity" />
           </div>
         </div>
+        
+        <div className="flex justify-between text-xs sm:text-sm text-gray-600">
+          <span className="font-medium tabular-nums">{formatTime(currentTime)}</span>
+          <span className="text-gray-400 tabular-nums">{isReady ? formatTime(duration) : '--:--'}</span>
+        </div>
+      </div>
 
-        {/* Main Controls */}
-        <div className="flex items-center justify-between gap-2">
-          {/* Left: Skip controls */}
-          <div className="flex items-center gap-1">
+      {/* Main Controls - Mobile Optimized */}
+      <div className="flex items-center justify-between gap-2 sm:gap-3">
+        {/* Left: Skip controls */}
+        <div className="flex items-center gap-1 sm:gap-1.5">
+          <Button
+            size="icon"
+            variant="ghost"
+            onClick={() => skip(-10)}
+            disabled={!isReady}
+            className="h-8 w-8 sm:h-9 sm:w-9 hover:bg-purple-50 hover:text-purple-600"
+            title="Back 10 seconds"
+          >
+            <SkipBack className="h-4 w-4" />
+          </Button>
+
+          <Button
+            size="icon"
+            variant="default"
+            onClick={togglePlay}
+            disabled={!isReady}
+            className="h-11 w-11 sm:h-12 sm:w-12 rounded-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 shadow-lg"
+          >
+            {isPlaying ? (
+              <Pause className="h-5 w-5" />
+            ) : (
+              <Play className="h-5 w-5 ml-0.5" />
+            )}
+          </Button>
+
+          <Button
+            size="icon"
+            variant="ghost"
+            onClick={() => skip(10)}
+            disabled={!isReady}
+            className="h-8 w-8 sm:h-9 sm:w-9 hover:bg-purple-50 hover:text-purple-600"
+            title="Forward 10 seconds"
+          >
+            <SkipForward className="h-4 w-4" />
+          </Button>
+        </div>
+
+        {/* Right: Volume and speed - Hidden on small mobile */}
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          {/* Speed control */}
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={changeSpeed}
+            disabled={!isReady}
+            className="h-8 sm:h-9 min-w-[45px] sm:min-w-[50px] text-xs font-bold hover:bg-purple-50 hover:text-purple-600 hover:border-purple-300"
+          >
+            {playbackRate}x
+          </Button>
+
+          {/* Volume control - Hidden on very small screens */}
+          <div className="hidden xs:flex items-center gap-1.5">
             <Button
               size="icon"
               variant="ghost"
-              onClick={() => skip(-10)}
+              onClick={toggleMute}
               disabled={!isReady}
-              className="h-8 w-8"
-              title="Back 10 seconds"
+              className="h-8 w-8 sm:h-9 sm:w-9 hover:bg-purple-50 hover:text-purple-600"
             >
-              <SkipBack className="h-4 w-4" />
-            </Button>
-
-            <Button
-              size="icon"
-              variant="default"
-              onClick={togglePlay}
-              disabled={!isReady}
-              className="h-10 w-10 rounded-full"
-            >
-              {isPlaying ? (
-                <Pause className="h-4 w-4" />
+              {isMuted || volume === 0 ? (
+                <VolumeX className="h-4 w-4" />
               ) : (
-                <Play className="h-4 w-4 ml-0.5" />
+                <Volume2 className="h-4 w-4" />
               )}
             </Button>
-
-            <Button
-              size="icon"
-              variant="ghost"
-              onClick={() => skip(10)}
-              disabled={!isReady}
-              className="h-8 w-8"
-              title="Forward 10 seconds"
-            >
-              <SkipForward className="h-4 w-4" />
-            </Button>
-          </div>
-
-          {/* Right: Volume and speed */}
-          <div className="flex items-center gap-2">
-            {/* Speed control */}
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={changeSpeed}
-              disabled={!isReady}
-              className="h-8 min-w-[50px] text-xs font-semibold"
-            >
-              {playbackRate}x
-            </Button>
-
-            {/* Volume control */}
-            <div className="flex items-center gap-1.5">
-              <Button
-                size="icon"
-                variant="ghost"
-                onClick={toggleMute}
-                disabled={!isReady}
-                className="h-8 w-8"
-              >
-                {isMuted || volume === 0 ? (
-                  <VolumeX className="h-4 w-4" />
-                ) : (
-                  <Volume2 className="h-4 w-4" />
-                )}
-              </Button>
-
+            
+            {/* Volume slider - Hidden on mobile */}
+            <div className="hidden sm:block relative w-20">
+              <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-gradient-to-r from-purple-500 to-blue-500 rounded-full"
+                  style={{ width: `${volume * 100}%` }}
+                />
+              </div>
               <input
                 type="range"
                 min="0"
                 max="1"
-                step="0.1"
+                step="0.01"
                 value={volume}
                 onChange={handleVolumeChange}
                 disabled={!isReady}
-                className="w-16 h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-                title="Volume"
+                className="absolute inset-0 w-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
               />
             </div>
           </div>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
