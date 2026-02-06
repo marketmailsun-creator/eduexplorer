@@ -283,9 +283,10 @@ export function QueryInput() {QueryInput
               </label>
               <Textarea
                 value={query}
+                className="min-h-[120px] md:min-h-[80px] text-base" // Larger touch target
+                placeholder="What do you want to learn?"
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="e.g., Explain quantum computing..."
-                className="min-h-32"
+                //className="min-h-32"
                 disabled={loading}
                 required
               />

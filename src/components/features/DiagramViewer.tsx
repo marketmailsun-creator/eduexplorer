@@ -75,109 +75,74 @@ export function DiagramViewer({ diagrams }: DiagramViewerProps) {
 
   const renderedUrl = renderedDiagrams.get(currentDiagram.id);
 
-  return (
-    <div className="space-y-4">
+return (
+    <div className="space-y-3 sm:space-y-4">
       {/* Diagram Display */}
       <Card className="overflow-hidden">
-        <CardContent className="p-6">
-          <div className="space-y-4">
-            {/* Title */}
+        <CardContent className="p-3 sm:p-4 md:p-6">
+          <div className="space-y-3 sm:space-y-4">
+            {/* Title - Mobile Optimized */}
             <div className="flex items-center justify-between">
-              <h3 className="text-xl font-semibold">{currentDiagram.title}</h3>
-              <span className="text-sm text-muted-foreground px-3 py-1 bg-blue-50 rounded-full">
+              <h3 className="text-base sm:text-lg md:text-xl font-semibold">
+                {currentDiagram.title}
+              </h3>
+              <span className="text-xs sm:text-sm text-muted-foreground px-2 sm:px-3 py-1 bg-blue-50 rounded-full">
                 {currentDiagram.type}
               </span>
             </div>
 
-            {/* Description */}
-            <p className="text-sm text-muted-foreground">
+            {/* Description - Mobile Optimized */}
+            <p className="text-xs sm:text-sm text-muted-foreground">
               {currentDiagram.description}
             </p>
 
-            {/* Diagram Image */}
-            <div className="bg-white border-2 border-gray-200 rounded-lg p-8 flex items-center justify-center min-h-[400px]">
+            {/* Diagram Image - Mobile Optimized Height */}
+            <div className="bg-white border-2 border-gray-200 rounded-lg p-2 sm:p-4 md:p-6 lg:p-8 flex items-center justify-center min-h-[200px] sm:min-h-[250px] md:min-h-[300px] lg:min-h-[400px]">
               {loading ? (
-                <div className="flex flex-col items-center gap-4 text-gray-500">
-                  <Loader2 className="h-12 w-12 animate-spin" />
-                  <p>Rendering diagram...</p>
-                </div>
+                <Loader2 className="h-8 w-8 sm:h-10 sm:w-10 md:h-12 md:w-12 animate-spin text-purple-600" />
               ) : renderedUrl ? (
                 <img
                   src={renderedUrl}
                   alt={currentDiagram.title}
-                  className="max-w-full h-auto"
-                  style={{ maxHeight: '400px' }}
+                  className="max-w-full h-auto max-h-[250px] sm:max-h-[300px] md:max-h-[400px] lg:max-h-[500px] object-contain"
+                  onError={() => console.error('Failed to load diagram')}
                 />
-              ) : currentDiagram.mermaidCode ? (
-                <div className="w-full max-w-2xl">
-                  <div className="bg-gray-50 border rounded-lg p-6">
-                    <p className="text-sm font-semibold mb-3 text-gray-700">Diagram Code:</p>
-                    <pre className="text-xs text-gray-600 overflow-x-auto whitespace-pre-wrap break-words">
-                      {currentDiagram.mermaidCode}
-                    </pre>
-                  </div>
-                  <p className="text-xs text-center text-gray-500 mt-4">
-                    Visual rendering temporarily unavailable - showing code representation
-                  </p>
-                </div>
               ) : (
-                <div className="text-center text-gray-400">
-                  <p>No diagram available</p>
-                </div>
+                <p className="text-sm sm:text-base text-gray-500">Failed to load diagram</p>
               )}
-            </div>
-
-            {/* Help Text */}
-            <div className="text-xs text-center text-gray-500 bg-blue-50 p-3 rounded">
-              💡 Tip: Diagrams show key concepts and their relationships visually
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Navigation */}
-      {diagrams.length > 1 && (
-        <div className="flex items-center justify-between">
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={prevDiagram}
-            disabled={currentIndex === 0}
-          >
-            <ChevronLeft className="h-4 w-4 mr-1" />
-            Previous
-          </Button>
+      {/* Navigation - Mobile Optimized */}
+      <div className="flex items-center justify-between gap-2 sm:gap-4">
+        <Button
+          onClick={prevDiagram}
+          disabled={currentIndex === 0}
+          variant="outline"
+          size="sm"
+          className="text-xs sm:text-sm"
+        >
+          <ChevronLeft className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+          Previous
+        </Button>
 
-          <div className="flex items-center gap-2">
-            {diagrams.map((_, index) => (
-              <button
-                key={index}
-                onClick={() => setCurrentIndex(index)}
-                className={`h-2 rounded-full transition-all ${
-                  index === currentIndex
-                    ? 'w-8 bg-blue-600'
-                    : 'w-2 bg-gray-300 hover:bg-gray-400'
-                }`}
-                aria-label={`Go to diagram ${index + 1}`}
-              />
-            ))}
-          </div>
+        <span className="text-xs sm:text-sm text-muted-foreground">
+          Diagram {currentIndex + 1} of {diagrams.length}
+        </span>
 
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={nextDiagram}
-            disabled={currentIndex === diagrams.length - 1}
-          >
-            Next
-            <ChevronRight className="h-4 w-4 ml-1" />
-          </Button>
-        </div>
-      )}
-
-      <p className="text-xs text-center text-muted-foreground">
-        Diagram {currentIndex + 1} of {diagrams.length}
-      </p>
+        <Button
+          onClick={nextDiagram}
+          disabled={currentIndex === diagrams.length - 1}
+          variant="outline"
+          size="sm"
+          className="text-xs sm:text-sm"
+        >
+          Next
+          <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4 ml-1" />
+        </Button>
+      </div>
     </div>
   );
 }

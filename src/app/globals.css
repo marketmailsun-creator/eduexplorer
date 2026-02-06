@@ -284,3 +284,50 @@ video {
 
 .animate-fade-in { animation: fade-in 0.6s ease-out forwards; }
 .animate-slide-up { animation: slide-up 0.8s ease-out forwards; }
+
+/* Add these mobile-first utilities */
+
+/* Safe area for iOS notch */
+.safe-area-inset-top {
+  padding-top: env(safe-area-inset-top);
+}
+
+.safe-area-inset-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Bigger touch targets on mobile */
+@media (max-width: 768px) {
+  button, a {
+    min-height: 44px; /* iOS minimum touch target */
+  }
+
+  input, textarea, select {
+    font-size: 16px; /* Prevents zoom on iOS */
+    min-height: 44px;
+  }
+}
+
+/* Prevent text overflow */
+.text-overflow-clip {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Stack cards on mobile */
+.mobile-stack > * {
+  @apply mb-4;
+}
+
+@media (min-width: 768px) {
+  .mobile-stack {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.5rem;
+  }
+  
+  .mobile-stack > * {
+    @apply mb-0;
+  }
+}

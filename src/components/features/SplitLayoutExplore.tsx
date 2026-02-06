@@ -107,7 +107,7 @@ export function SplitLayoutExplore() {
   };
 
   const handleDeleteHistoryItem = async (queryId: string, e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevent opening the item
+    e.stopPropagation();
     
     if (!confirm('Delete this item from history?')) return;
     
@@ -125,8 +125,6 @@ export function SplitLayoutExplore() {
       }
 
       console.log('✅ History item deleted');
-      
-      // Remove from local state
       setHistoryItems(prev => prev.filter(item => item.id !== queryId));
     } catch (err) {
       console.error('❌ Delete error:', err);
@@ -297,53 +295,55 @@ export function SplitLayoutExplore() {
     { icon: Layers, title: "Flashcards", color: "from-green-500 to-emerald-500" },
     { icon: Brain, title: "Quiz", color: "from-indigo-500 to-purple-500" },
     { icon: BarChart3, title: "Diagrams", color: "from-yellow-500 to-orange-500" },
-    { icon: Network, title: "Map", color: "from-teal-500 to-cyan-500" },
+    // { icon: Network, title: "Map", color: "from-teal-500 to-cyan-500" },
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-purple-50">
-      <div className="max-w-7xl mx-auto px-4 py-8">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-purple-50 pb-16 md:pb-8">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-6 md:py-8">
         
-        {/* Hero Section */}
-        <div className="text-center mb-8 space-y-4">
-          <div className="inline-flex items-center gap-2 px-4 py-2 bg-blue-100 text-blue-700 rounded-full text-sm font-medium mb-4 animate-pulse">
-            <Sparkles className="h-4 w-4" />
-            AI-Powered Learning Platform
+        {/* Hero Section - Mobile Optimized */}
+        <div className="text-center mb-6 sm:mb-8 space-y-2 sm:space-y-4">
+          <div className="inline-flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-blue-100 text-blue-700 rounded-full text-xs sm:text-sm font-medium mb-2 sm:mb-4 animate-pulse">
+            <Sparkles className="h-3 w-3 sm:h-4 sm:w-4" />
+            <span className="hidden xs:inline">AI-Powered Learning Platform</span>
+            <span className="xs:hidden">AI Learning</span>
           </div>
           
-          <h1 className="text-4xl md:text-4xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent px-4">
             Learn Anything, Instantly
           </h1>
           
-          <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-            Ask any question and get comprehensive learning materials in 7 formats
+          <p className="text-sm sm:text-base md:text-lg text-gray-600 max-w-2xl mx-auto px-4">
+            Ask any question and get comprehensive learning materials
           </p>
         </div>
 
-        {/* Main Split Layout */}
-        <div className="grid lg:grid-cols-12 gap-6">
+        {/* Main Layout - Stack on Mobile, Side-by-Side on Desktop */}
+        <div className="flex flex-col lg:grid lg:grid-cols-12 gap-4 sm:gap-6">
           
-          {/* LEFT: Query Input (60%) */}
+          {/* LEFT: Query Input */}
           <div className="lg:col-span-7">
-            <div className="bg-white rounded-2xl shadow-xl p-6 border border-gray-100">
-              <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="bg-white rounded-xl sm:rounded-2xl shadow-xl p-4 sm:p-6 border border-gray-100">
+              <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-4">
                 
-                {/* Query Input */}
+                {/* Query Input - Mobile Optimized */}
                 <div>
                   <label className="block text-sm font-semibold text-gray-900 mb-2">
-                    What would you like to learn? 🎯
+                    <span className="hidden sm:inline">What would you like to learn? 🎯</span>
+                    <span className="sm:hidden">Your Question 🎯</span>
                   </label>
                   <Textarea
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
-                    placeholder="e.g., Explain quantum computing, How does photosynthesis work, Spanish grammar basics..."
-                    className="min-h-32 text-base resize-none"
+                    placeholder="e.g., Explain quantum computing..."
+                    className="min-h-[100px] sm:min-h-[120px] text-sm sm:text-base resize-none"
                     disabled={loading}
                     required
                   />
                 </div>
 
-                {/* Learning Level */}
+                {/* Learning Level - Mobile Optimized */}
                 <div>
                   <label className="block text-sm font-semibold text-gray-900 mb-2">
                     Learning Level 📚
@@ -352,7 +352,7 @@ export function SplitLayoutExplore() {
                     value={level}
                     onChange={(e) => setLevel(e.target.value)}
                     disabled={loading}
-                    className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-sm font-medium focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                    className="w-full rounded-lg border border-gray-300 bg-white px-3 sm:px-4 py-2 sm:py-3 text-sm font-medium focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
                   >
                     <option value="elementary">Elementary School</option>
                     <option value="high-school">High School</option>
@@ -361,22 +361,22 @@ export function SplitLayoutExplore() {
                   </select>
                 </div>
 
-                {/* Media Attachments Preview */}
+                {/* Media Attachments Preview - Mobile Optimized */}
                 {attachedFiles.length > 0 && (
                   <div className="flex flex-wrap gap-2">
                     {attachedFiles.map((file) => (
                       <div key={file.id} className="relative group">
                         {file.type === 'image' && file.preview ? (
-                          <img src={file.preview} alt="" className="w-20 h-20 object-cover rounded-lg border-2 border-gray-200" />
+                          <img src={file.preview} alt="" className="w-16 h-16 sm:w-20 sm:h-20 object-cover rounded-lg border-2 border-gray-200" />
                         ) : (
-                          <div className="w-20 h-20 bg-gray-100 rounded-lg border-2 border-gray-200 flex items-center justify-center">
-                            <FileIcon className="h-8 w-8 text-gray-400" />
+                          <div className="w-16 h-16 sm:w-20 sm:h-20 bg-gray-100 rounded-lg border-2 border-gray-200 flex items-center justify-center">
+                            <FileIcon className="h-6 w-6 sm:h-8 sm:w-8 text-gray-400" />
                           </div>
                         )}
                         <button
                           type="button"
                           onClick={() => removeFile(file.id)}
-                          className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                          className="absolute -top-1 -right-1 sm:-top-2 sm:-right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
                         >
                           <X className="h-3 w-3" />
                         </button>
@@ -385,16 +385,16 @@ export function SplitLayoutExplore() {
                   </div>
                 )}
 
-                {/* Audio Preview */}
+                {/* Audio Preview - Mobile Optimized */}
                 {audioURL && (
-                  <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                  <div className="flex items-center gap-2 sm:gap-3 p-2.5 sm:p-3 bg-blue-50 rounded-lg border border-blue-200">
                     <audio ref={audioPlayerRef} src={audioURL} onEnded={() => setIsPlayingAudio(false)} />
-                    <Button type="button" size="sm" variant="ghost" onClick={toggleAudioPlayback}>
+                    <Button type="button" size="sm" variant="ghost" onClick={toggleAudioPlayback} className="h-8 w-8 p-0">
                       {isPlayingAudio ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
                     </Button>
-                    <Volume2 className="h-4 w-4 text-blue-600" />
-                    <span className="text-sm text-blue-900 flex-1">Voice recording attached</span>
-                    <Button type="button" size="sm" variant="ghost" onClick={removeAudio}>
+                    <Volume2 className="h-4 w-4 text-blue-600 flex-shrink-0" />
+                    <span className="text-xs sm:text-sm text-blue-900 flex-1 truncate">Voice recording</span>
+                    <Button type="button" size="sm" variant="ghost" onClick={removeAudio} className="h-8 w-8 p-0">
                       <X className="h-4 w-4" />
                     </Button>
                   </div>
@@ -402,20 +402,22 @@ export function SplitLayoutExplore() {
 
                 {/* Error Message */}
                 {error && (
-                  <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+                  <div className="bg-red-50 border border-red-200 text-red-700 px-3 sm:px-4 py-2 sm:py-3 rounded-lg text-xs sm:text-sm">
                     {error}
                   </div>
                 )}
 
-                {/* Action Buttons */}
-                <div className="flex items-center justify-between gap-3 pt-2">
-                  {/* Media Buttons */}
-                  <div className="flex gap-2">
-                    <Button type="button" variant="outline" size="sm" onClick={handleCameraClick} disabled={loading}>
+                {/* Action Buttons - Mobile Optimized */}
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2">
+                  {/* Media Buttons - Full Width on Mobile */}
+                  <div className="flex gap-2 justify-between sm:justify-start">
+                    <Button type="button" variant="outline" size="sm" onClick={handleCameraClick} disabled={loading} className="flex-1 sm:flex-none h-10">
                       <Camera className="h-4 w-4" />
+                      {/* <span className="ml-2 sm:hidden">Photo</span> */}
                     </Button>
-                    <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={loading}>
+                    <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={loading} className="flex-1 sm:flex-none h-10">
                       <Paperclip className="h-4 w-4" />
+                      {/* <span className="ml-2 sm:hidden">File</span> */}
                     </Button>
                     <Button
                       type="button"
@@ -423,24 +425,30 @@ export function SplitLayoutExplore() {
                       size="sm"
                       onClick={isRecording ? stopRecording : startRecording}
                       disabled={loading}
-                      className={isRecording ? 'bg-red-50 border-red-300 text-red-600' : ''}
+                      className={`flex-1 sm:flex-none h-10 ${isRecording ? 'bg-red-50 border-red-300 text-red-600' : ''}`}
                     >
                       <Mic className={`h-4 w-4 ${isRecording ? 'animate-pulse' : ''}`} />
+                      {/* <span className="ml-2 sm:hidden">{isRecording ? 'Stop' : 'Voice'}</span> */}
                     </Button>
-                    <Button type="button" variant="outline" size="sm" onClick={() => setShowHistory(true)} disabled={loading}>
+                    <Button type="button" variant="outline" size="sm" onClick={() => setShowHistory(true)} disabled={loading} className="flex-1 sm:flex-none h-10">
                       <History className="h-4 w-4" />
+                      {/* <span className="ml-2 sm:hidden">History</span> */}
                     </Button>
                   </div>
 
-                  {/* Submit Button */}
-                  <Button type="submit" disabled={loading} size="lg" className="px-8">
+                  {/* Submit Button - Full Width on Mobile */}
+                  <Button type="submit" disabled={loading} size="lg" className="w-full sm:w-auto px-6 sm:px-8 h-12">
                     {loading ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Researching...
+                        <span className="hidden sm:inline">Researching...</span>
+                        <span className="sm:hidden">Loading...</span>
                       </>
                     ) : (
-                      'Explore Topic'
+                      <>
+                        <span className="hidden sm:inline">Explore Topic</span>
+                        <span className="sm:hidden">Start Learning</span>
+                      </>
                     )}
                   </Button>
                 </div>
@@ -452,15 +460,18 @@ export function SplitLayoutExplore() {
               <input ref={galleryInputRef} type="file" hidden accept="image/*" onChange={handleFileSelect} />
             </div>
 
-            {/* Example Topics */}
-            <div className="mt-6 text-center">
-              <p className="text-sm font-medium text-gray-700 mb-3">Try these popular topics:</p>
-              <div className="flex flex-wrap justify-center gap-2">
+            {/* Example Topics - Mobile Optimized */}
+            <div className="mt-4 sm:mt-6 text-center">
+              <p className="text-xs sm:text-sm font-medium text-gray-700 mb-2 sm:mb-3">
+                <span className="hidden sm:inline">Try these popular topics:</span>
+                <span className="sm:hidden">Try these:</span>
+              </p>
+              <div className="flex flex-wrap justify-center gap-1.5 sm:gap-2">
                 {exampleTopics.map((topic, idx) => (
                   <button
                     key={idx}
                     onClick={() => setQuery(topic)}
-                    className="px-3 py-1.5 bg-white text-gray-700 rounded-full text-xs hover:bg-blue-50 hover:text-blue-600 transition-colors border border-gray-200 hover:border-blue-300"
+                    className="px-2 sm:px-3 py-1 sm:py-1.5 bg-white text-gray-700 rounded-full text-xs hover:bg-blue-50 hover:text-blue-600 transition-colors border border-gray-200 hover:border-blue-300"
                   >
                     {topic}
                   </button>
@@ -469,66 +480,55 @@ export function SplitLayoutExplore() {
             </div>
           </div>
 
-          {/* RIGHT: Features Showcase (40%) */}
-          <div className="lg:col-span-5 space-y-6">
+          {/* RIGHT: Features Showcase - Mobile Optimized */}
+          <div className="lg:col-span-5 space-y-4 sm:space-y-6">
             
-            {/* Capabilities */}
-            <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100">
-              <h3 className="text-lg font-bold text-gray-900 mb-4">What You'll Get</h3>
-              <div className="space-y-3">
+            {/* Capabilities - Mobile Optimized */}
+            <div className="bg-white rounded-xl sm:rounded-2xl shadow-lg p-4 sm:p-6 border border-gray-100">
+              <h3 className="text-base sm:text-lg font-bold text-gray-900 mb-3 sm:mb-4">What You'll Get</h3>
+              <div className="space-y-2 sm:space-y-3">
                 {capabilities.map((cap, idx) => (
-                  <div key={idx} className="flex items-center gap-3">
-                    <cap.icon className={`h-5 w-5 ${cap.color}`} />
-                    <span className="text-sm font-medium text-gray-700">{cap.text}</span>
+                  <div key={idx} className="flex items-center gap-2 sm:gap-3">
+                    <cap.icon className={`h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0 ${cap.color}`} />
+                    <span className="text-xs sm:text-sm font-medium text-gray-700">{cap.text}</span>
                   </div>
                 ))}
               </div>
             </div>
 
-            {/* 7 Formats */}
-            {/* 7 Formats */}
-            <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100">
-              <h3 className="text-lg font-bold text-gray-900 mb-4">7 Learning Formats</h3>
-              <div className="grid grid-cols-3 gap-2">
+            {/* 7 Formats - Mobile Optimized Grid */}
+            <div className="bg-white rounded-xl sm:rounded-2xl shadow-lg p-4 sm:p-6 border border-gray-100">
+              <h3 className="text-base sm:text-lg font-bold text-gray-900 mb-3 sm:mb-4">7 Learning Formats</h3>
+              <div className="grid grid-cols-3 sm:grid-cols-3 gap-1.5 sm:gap-2">
                 {features.map((feature, idx) => (
-                  <div key={idx} className="flex flex-col items-center text-center p-2 rounded-xl bg-gray-50 hover:bg-gradient-to-br hover:from-gray-50 hover:to-blue-50 transition-all group">
-                    <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${feature.color} flex items-center justify-center mb-2 group-hover:scale-110 transition-transform`}>
-                      <feature.icon className="h-5 w-5 text-white" />
+                  <div key={idx} className="flex flex-col items-center text-center p-2 sm:p-2.5 rounded-lg sm:rounded-xl bg-gray-50 hover:bg-gradient-to-br hover:from-gray-50 hover:to-blue-50 transition-all group">
+                    <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-gradient-to-br ${feature.color} flex items-center justify-center mb-1.5 sm:mb-2 group-hover:scale-110 transition-transform`}>
+                      <feature.icon className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
                     </div>
                     <span className="text-xs font-semibold text-gray-700">{feature.title}</span>
                   </div>
                 ))}
               </div>
             </div>
-
-            {/* Info Card */}
-            {/* <div className="bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl shadow-lg p-6 text-white">
-              <h3 className="text-lg font-bold mb-2">⚡ Fast Generation</h3>
-              <p className="text-sm opacity-90 mb-3">Complete learning package ready in ~2 minutes</p>
-              <div className="flex items-center gap-2 text-xs opacity-75">
-                <Clock className="h-4 w-4" />
-                <span>Auto-saved to your history</span>
-              </div>
-            </div> */}
           </div>
         </div>
       </div>
 
-      {/* Camera Modal */}
+      {/* Camera Modal - Mobile Optimized */}
       {showCameraModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl">
-            <h3 className="text-xl font-bold text-gray-900 mb-4">Add Photo</h3>
-            <div className="space-y-3">
-              <Button onClick={handleTakePhoto} className="w-full justify-start gap-3" size="lg">
+          <div className="bg-white rounded-xl sm:rounded-2xl p-4 sm:p-6 max-w-sm w-full shadow-2xl">
+            <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-3 sm:mb-4">Add Photo</h3>
+            <div className="space-y-2 sm:space-y-3">
+              <Button onClick={handleTakePhoto} className="w-full justify-start gap-3 h-12" size="lg">
                 <Camera className="h-5 w-5" />
                 Take Photo
               </Button>
-              <Button onClick={handleChooseFromGallery} variant="outline" className="w-full justify-start gap-3" size="lg">
+              <Button onClick={handleChooseFromGallery} variant="outline" className="w-full justify-start gap-3 h-12" size="lg">
                 <ImageIcon className="h-5 w-5" />
                 Choose from Gallery
               </Button>
-              <Button onClick={() => setShowCameraModal(false)} variant="ghost" className="w-full" size="lg">
+              <Button onClick={() => setShowCameraModal(false)} variant="ghost" className="w-full h-12" size="lg">
                 Cancel
               </Button>
             </div>
@@ -536,17 +536,17 @@ export function SplitLayoutExplore() {
         </div>
       )}
 
-      {/* History Sidebar with Delete */}
+      {/* History Sidebar - Mobile Full Screen */}
       {showHistory && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex justify-end z-50">
-          <div className="w-full max-w-md bg-white h-full shadow-2xl overflow-y-auto">
-            <div className="sticky top-0 bg-white border-b border-gray-200 p-4 flex items-center justify-between z-10">
-              <h3 className="text-xl font-bold text-gray-900">History</h3>
-              <Button variant="ghost" size="sm" onClick={() => setShowHistory(false)}>
+          <div className="w-full sm:max-w-md bg-white h-full shadow-2xl overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b border-gray-200 p-3 sm:p-4 flex items-center justify-between z-10">
+              <h3 className="text-lg sm:text-xl font-bold text-gray-900">History</h3>
+              <Button variant="ghost" size="sm" onClick={() => setShowHistory(false)} className="h-9 w-9 p-0">
                 <X className="h-5 w-5" />
               </Button>
             </div>
-            <div className="p-4">
+            <div className="p-3 sm:p-4">
               {historyLoading ? (
                 <div className="flex items-center justify-center py-12">
                   <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
@@ -554,8 +554,8 @@ export function SplitLayoutExplore() {
               ) : historyItems.length === 0 ? (
                 <div className="text-center py-12">
                   <FileText className="h-12 w-12 text-gray-400 mx-auto mb-3" />
-                  <p className="text-gray-600">No history yet</p>
-                  <p className="text-sm text-gray-400 mt-1">Your queries will appear here</p>
+                  <p className="text-gray-600 text-sm sm:text-base">No history yet</p>
+                  <p className="text-xs sm:text-sm text-gray-400 mt-1">Your queries will appear here</p>
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -567,12 +567,12 @@ export function SplitLayoutExplore() {
                       <button
                         onClick={() => handleHistoryItemClick(item.id)}
                         disabled={deletingIds.has(item.id)}
-                        className="w-full text-left p-3 pr-12 rounded-lg hover:bg-gray-50 border border-gray-200 hover:border-blue-300 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="w-full text-left p-2.5 sm:p-3 pr-10 sm:pr-12 rounded-lg hover:bg-gray-50 border border-gray-200 hover:border-blue-300 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        <div className="font-medium text-gray-900 line-clamp-1 group-hover:text-blue-600">
+                        <div className="text-sm sm:text-base font-medium text-gray-900 line-clamp-2 group-hover:text-blue-600">
                           {item.topicDetected || item.queryText}
                         </div>
-                        <div className="text-xs text-gray-500 mt-1 flex items-center gap-2">
+                        <div className="text-xs text-gray-500 mt-1 flex items-center gap-1.5 sm:gap-2">
                           <Clock className="h-3 w-3" />
                           {formatTimeAgo(item.createdAt)}
                         </div>
@@ -582,7 +582,7 @@ export function SplitLayoutExplore() {
                       <button
                         onClick={(e) => handleDeleteHistoryItem(item.id, e)}
                         disabled={deletingIds.has(item.id)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-600 transition-colors opacity-0 group-hover:opacity-100 disabled:opacity-50"
+                        className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 p-2 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-600 transition-colors opacity-0 group-hover:opacity-100 disabled:opacity-50"
                         title="Delete from history"
                       >
                         {deletingIds.has(item.id) ? (

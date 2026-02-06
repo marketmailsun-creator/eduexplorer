@@ -186,15 +186,14 @@ export function InteractiveResultsView({
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 min-h-[calc(100vh-8rem)] w-full">
+     <div className="space-y-4 md:space-y-6">
+      <div className="flex flex-col lg:grid lg:grid-cols-2 gap-4 md:gap-6">
       
+      {/* LEFT COLUMN (Desktop) / TOP SECTION (Mobile) - Article Content */}
+      <div className={`flex flex-col gap-6 ${presentationSize === 'maximized' || flashcardsSize === 'maximized' || quizSize === 'maximized' ? 'lg:col-span-2' : ''}`}>
       {/* LEFT COLUMN */}
-      <div className={`flex flex-col gap-6 h-[calc(100vh-1rem)] min-h-0 ${explanationSize === 'maximized' || audioSize === 'maximized' 
-        || diagramsSize === 'maximized' || conceptMapSize === 'maximized' ? 'lg:col-span-2' : ''}`}>
-        
-        {/* Comprehensive Explanation */}
-        <Card className={`${getCardClass(explanationSize, 'flex-none h-[55%]')} transition-all`}>
-          <CardHeader className="pb-3">
+         <Card className="w-full">
+          <CardHeader className="pb-3 px-4">
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center gap-2 text-base">
                 <BookOpen className="h-5 w-5 text-blue-600" />
@@ -250,8 +249,8 @@ export function InteractiveResultsView({
         </Card>
 
         {/* Presentation */}
-        <Card className={`${getCardClass(presentationSize )} transition-all`}>
-          <CardHeader className="pb-3">
+        <Card className="w-full">
+          <CardHeader className="pb-3 px-4">
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center gap-2 text-base">
                 <Presentation className="h-5 w-5 text-red-600" />
@@ -304,8 +303,8 @@ export function InteractiveResultsView({
         </Card>
 
         {/* Visual Diagrams */}
-        <Card className={`${getCardClass(diagramsSize)} transition-all`}>
-          <CardHeader className="pb-3">
+        <Card className="w-full">
+          <CardHeader className="pb-3 px-4">
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center gap-2 text-base">
                 <BarChart3 className="h-5 w-5 text-green-600" />
@@ -356,8 +355,8 @@ export function InteractiveResultsView({
 
         {/* Concept Map */}
         {conceptMapData && (
-          <Card className={`${getCardClass(conceptMapSize)} transition-all`}>
-            <CardHeader className="pb-3">
+           <Card className="w-full">          
+            <CardHeader className="pb-3 px-4">
               <div className="flex items-center justify-between">
                 <CardTitle className="flex items-center gap-2 text-base">
                   <Network className="h-5 w-5 text-orange-600" />
@@ -409,13 +408,13 @@ export function InteractiveResultsView({
             )}
           </Card>
         )}
-      </div>
+      </div> 
 
       {/* RIGHT COLUMN */}
       <div className={`flex flex-col gap-6 ${presentationSize === 'maximized' || flashcardsSize === 'maximized' || quizSize === 'maximized' ? 'lg:col-span-2' : ''}`}>
         {/* Audio Player */}
-        <Card className={`${getCardClass(audioSize)} transition-all`}>
-          <CardHeader className="pb-3">
+        <Card className="w-full">
+          <CardHeader className="pb-3 px-4">
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center gap-2 text-base">
                 <Headphones className="h-5 w-5 text-purple-600" />
@@ -474,9 +473,9 @@ export function InteractiveResultsView({
           )}
         </Card>
 
-        {/* Quiz */}
-        <Card className={`${getCardClass(quizSize)} transition-all`}>
-          <CardHeader className="pb-3">
+        {/* Quiz <Card className={`${getCardClass(quizSize)} transition-all`}>*/}
+        <Card className="w-full">
+          <CardHeader className="pb-3 px-4">
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center gap-2 text-base">
                 <Brain className="h-5 w-5 text-pink-600" />
@@ -525,9 +524,9 @@ export function InteractiveResultsView({
           )}
         </Card>
 
-        {/* Flashcards */}
-        <Card className={`${getCardClass(flashcardsSize)} transition-all`}>
-          <CardHeader className="pb-3">
+        {/* Flashcards className={`${getCardClass(flashcardsSize)} transition-all`}*/}
+        <Card className='w-full'>
+          <CardHeader className="pb-3 px-4">
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center gap-2 text-base">
                 <Layers className="h-5 w-5 text-indigo-600" />
@@ -578,6 +577,7 @@ export function InteractiveResultsView({
 
         
       </div>
+    </div>
     </div>
   );
 }

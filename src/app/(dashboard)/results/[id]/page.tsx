@@ -129,32 +129,40 @@ export default async function ResultsPage({
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header Section */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Link href="/explore">
-              <Button variant="ghost" size="sm" className="gap-2 rounded-lg">
-                <ArrowLeft className="h-4 w-4 text-purple-600" />
-                Back
-              </Button>
-            </Link>
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">{query.queryText}</h1>
-              <p className="text-sm text-gray-600 mt-1">
-                Level: {query.complexityLevel || 'college'}
-              </p>
-            </div>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" className="gap-2 rounded-lg border-gray-300">
-              <Download className="h-4 w-4 text-blue-600" />
-              Export
+      {/* Header Section - Mobile Optimized */}
+      <div className="bg-white border-b border-gray-200 px-4 py-3 sticky top-0 z-10">
+        <div className="max-w-7xl mx-auto">
+          {/* Back Button */}
+          <Link href="/explore">
+            <Button variant="ghost" size="sm" className="gap-2 mb-2 -ml-2">
+              <ArrowLeft className="h-4 w-4 text-purple-600" />
+              <span className="text-sm">Back</span>
             </Button>
-            <Button variant="outline" size="sm" className="gap-2 rounded-lg border-gray-300">
-              <Share2 className="h-4 w-4 text-indigo-600" />
-              Share
+          </Link>
+          
+          {/* Title - Responsive Text Size */}
+          <div>
+            <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 leading-tight">
+              {query.queryText}
+            </h1>
+            <p className="text-xs sm:text-sm text-gray-600 mt-1">
+              Level: {query.complexityLevel || 'college'}
+            </p>
+          </div>
+          
+          {/* Remove Export/Share buttons - commented out for future use */}
+          {/* 
+          <div className="flex gap-2 mt-3">
+            <Button variant="outline" size="sm" className="gap-2">
+              <Download className="h-4 w-4" />
+              <span className="hidden sm:inline">Export</span>
+            </Button>
+            <Button variant="outline" size="sm" className="gap-2">
+              <Share2 className="h-4 w-4" />
+              <span className="hidden sm:inline">Share</span>
             </Button>
           </div>
+          */}
         </div>
       </div>
 
