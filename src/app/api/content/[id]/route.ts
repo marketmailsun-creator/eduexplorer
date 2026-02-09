@@ -38,7 +38,7 @@ export async function GET(
     );
   }
 }
-
+//test commit
 export async function DELETE(
   req: NextRequest,
   context: { params: Promise<{ id: string }> } // ✅ Changed to Promise
