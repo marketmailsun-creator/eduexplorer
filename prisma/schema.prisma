@@ -74,6 +74,25 @@ model User {
   savedContent  SavedContent[]
   preferences   UserPreferences?
   analytics     LearningAnalytics[]
+  sharedContent      SharedContent[]
+  comments           Comment[]
+  commentLikes       CommentLike[]
+  createdGroups      StudyGroup[]
+  groupMemberships   StudyGroupMember[]
+  groupSharedContent GroupSharedContent[]
+  quizScores         QuizScore[]
+  followers          UserFollow[]      @relation("UserFollower")
+  following          UserFollow[]      @relation("UserFollowing")
+
+  // Razorpay fields
+  razorpayCustomerId    String?
+  razorpayOrderId       String?
+  razorpayPaymentId     String?
+  razorpaySubscriptionId String?  @unique 
+  
+  pushSubscriptions PushSubscription[]
+  subscription Subscription[]
+  savedQueries      SavedQuery[]
 
   @@map("users")
 }
@@ -107,7 +126,10 @@ model Query {
   user         User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   researchData ResearchData?
   content      Content[]
+  sharedContent SharedContent[]
 
+  quizScores         QuizScore[]
+  savedByUsers      SavedQuery[]
   @@index([userId])
   @@index([createdAt])
   @@map("queries")
@@ -138,6 +160,8 @@ model Content {
 
   query        Query          @relation(fields: [queryId], references: [id], onDelete: Cascade)
   savedBy      SavedContent[]
+
+  groupShares        GroupSharedContent[]
 
   @@index([queryId])
   @@index([contentType])
@@ -175,4 +199,194 @@ model LearningAnalytics {
   @@index([userId])
   @@index([recordedAt])
   @@map("learning_analytics")
+}
+
+// Shared Content
+model SharedContent {
+  id          String   @id @default(cuid())
+  queryId     String
+  userId      String
+  shareType   String   // "public" | "private" | "friends"
+  shareToken  String   @unique
+  views       Int      @default(0)
+  createdAt   DateTime @default(now())
+  expiresAt   DateTime?
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  query       Query    @relation(fields: [queryId], references: [id], onDelete: Cascade)
+  comments    Comment[]
+
+  @@index([shareToken])
+  @@index([userId])
+  @@index([queryId])
+  @@map("shared_content")
+}
+
+// Comments on shared content
+model Comment {
+  id              String   @id @default(cuid())
+  sharedContentId String
+  userId          String
+  text            String   @db.Text
+  parentId        String?  // For nested replies
+  likes           Int      @default(0)
+  createdAt       DateTime @default(now())
+
+  sharedContent   SharedContent @relation(fields: [sharedContentId], references: [id], onDelete: Cascade)
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parent          Comment?      @relation("CommentReplies", fields: [parentId], references: [id])
+  replies         Comment[]     @relation("CommentReplies")
+  likedBy         CommentLike[]
+
+  @@index([sharedContentId])
+  @@index([userId])
+  @@map("comments")
+}
+
+// Comment likes
+model CommentLike {
+  id        String   @id @default(cuid())
+  commentId String
+  userId    String
+  createdAt DateTime @default(now())
+
+  comment   Comment  @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([commentId, userId])
+  @@map("comment_likes")
+}
+
+// Study Groups
+model StudyGroup {
+  id          String   @id @default(cuid())
+  name        String
+  description String?  @db.Text
+  creatorId   String
+  inviteCode  String   @unique
+  isPublic    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  creator     User              @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  members     StudyGroupMember[]
+  sharedContent GroupSharedContent[]
+
+  @@index([inviteCode])
+  @@map("study_groups")
+}
+
+// Study Group Members
+model StudyGroupMember {
+  id        String   @id @default(cuid())
+  groupId   String
+  userId    String
+  role      String   @default("member") // "admin" | "member"
+  joinedAt  DateTime @default(now())
+
+  group     StudyGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, userId])
+  @@index([userId])
+  @@map("study_group_members")
+}
+
+// Content shared in groups
+model GroupSharedContent {
+  id        String   @id @default(cuid())
+  groupId   String
+  contentId String
+  userId    String
+  createdAt DateTime @default(now())
+
+  group     StudyGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  content   Content    @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([groupId])
+  @@map("group_shared_content")
+}
+
+// Quiz Leaderboard
+model QuizScore {
+  id          String   @id @default(cuid())
+  userId      String
+  queryId     String
+  score       Int
+  totalQuestions Int
+  timeSpent   Int      // seconds
+  completedAt DateTime @default(now())
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  query       Query    @relation(fields: [queryId], references: [id], onDelete: Cascade)
+
+  @@index([queryId])
+  @@index([userId])
+  @@index([score])
+  @@map("quiz_scores")
+}
+
+// User follows (for social feed)
+model UserFollow {
+  id          String   @id @default(cuid())
+  followerId  String
+  followingId String
+  createdAt   DateTime @default(now())
+
+  follower    User     @relation("UserFollower", fields: [followerId], references: [id], onDelete: Cascade)
+  following   User     @relation("UserFollowing", fields: [followingId], references: [id], onDelete: Cascade)
+
+  @@unique([followerId, followingId])
+  @@index([followerId])
+  @@index([followingId])
+  @@map("user_follows")
+}
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("push_subscriptions")
+}
+
+model Subscription {
+  id                    String    @id @default(cuid())
+  userId                String
+  plan                  String
+  status                String
+  razorpayOrderId       String
+  razorpayPaymentId     String
+  razorpaySubscriptionId String?
+  startDate             DateTime
+  endDate               DateTime
+  createdAt             DateTime  @default(now())
+  
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+  @@map("subscriptions")
+}
+
+model SavedQuery {
+  id                String            @id @default(cuid())
+  userId            String
+  queryId           String
+  tags              String[]          @default([])
+  notes             String?           @db.Text
+  savedAt           DateTime          @default(now())
+  
+  user              User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  query             Query             @relation(fields: [queryId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, queryId])
+  @@index([userId])
+  @@index([queryId])
+  @@map("saved_queries")
 }

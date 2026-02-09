@@ -512,7 +512,7 @@ export function InteractiveResultsView({
           {quizSize !== 'minimized' && (
             <CardContent>
               {hasQuiz && quiz ? (
-                <PracticeQuizViewer quiz={quiz} />
+                <PracticeQuizViewer quiz={quiz} queryId={query.id} />
               ) : (
                 <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed">
                   <Brain className="h-16 w-16 mx-auto mb-4 text-gray-400" />

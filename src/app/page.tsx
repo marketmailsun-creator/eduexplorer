@@ -1,14 +1,23 @@
-import { auth } from '@/auth';
-import { redirect } from 'next/navigation';
+'use client';
 
-export default async function HomePage() {
-  const session = await auth();
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { Loader2 } from 'lucide-react';
 
-  // If user is already logged in, go to explore page
-  if (session) {
-    redirect('/explore');
-  }
+export default function HomePage() {
+  const router = useRouter();
 
-  // If not logged in, redirect to login page
-  redirect('/login');
+  useEffect(() => {
+    // Client-side redirect
+    router.replace('/login');
+  }, [router]);
+
+  return (
+    <div className="min-h-screen flex items-center justify-center">
+      <div className="text-center">
+        <Loader2 className="h-12 w-12 animate-spin mx-auto mb-4 text-purple-600" />
+        <p className="text-gray-600">Redirecting...</p>
+      </div>
+    </div>
+  );
 }

@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { CheckCircle2, XCircle, ChevronRight, RotateCcw } from 'lucide-react';
+import { CheckCircle2, XCircle, ChevronRight, RotateCcw, Loader2 } from 'lucide-react';
+import { QuizLeaderboard } from '@/components/social/QuizLeaderboard';
 
 interface PracticeQuestion {
   id: number;
@@ -23,13 +24,22 @@ interface PracticeQuiz {
 
 interface PracticeQuizViewerProps {
   quiz: PracticeQuiz;
+  queryId: string; // Added queryId prop
 }
 
-export function PracticeQuizViewer({ quiz }: PracticeQuizViewerProps) {
+export function PracticeQuizViewer({ quiz, queryId }: PracticeQuizViewerProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const [showAnswer, setShowAnswer] = useState(false);
   const [quizComplete, setQuizComplete] = useState(false);
+  const [startTime, setStartTime] = useState<number>(Date.now());
+  const [submittingScore, setSubmittingScore] = useState(false);
+  const [scoreSubmitted, setScoreSubmitted] = useState(false);
+
+  // Reset start time when quiz starts/resets
+  useEffect(() => {
+    setStartTime(Date.now());
+  }, []);
 
   const currentQuestion = quiz.questions[currentIndex];
   const userAnswer = answers[currentQuestion.id];
@@ -45,7 +55,49 @@ export function PracticeQuizViewer({ quiz }: PracticeQuizViewerProps) {
       setCurrentIndex(prev => prev + 1);
       setShowAnswer(false);
     } else {
-      setQuizComplete(true);
+      // Quiz finished - submit score
+      handleQuizComplete();
+    }
+  };
+
+  const handleQuizComplete = async () => {
+    setQuizComplete(true);
+    
+    // Calculate score and time
+    const correctAnswers = quiz.questions.filter(q => 
+      answers[q.id]?.toLowerCase().trim() === q.correctAnswer.toLowerCase().trim()
+    ).length;
+    
+    const timeSpent = Math.floor((Date.now() - startTime) / 1000); // in seconds
+
+    // Submit score to backend
+    await submitScore(correctAnswers, quiz.totalQuestions, timeSpent);
+  };
+
+  const submitScore = async (score: number, totalQuestions: number, timeSpent: number) => {
+    setSubmittingScore(true);
+    try {
+      const response = await fetch('/api/quiz/submit-score', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          queryId,
+          score,
+          totalQuestions,
+          timeSpent,
+        }),
+      });
+
+      if (response.ok) {
+        console.log('✅ Quiz score saved successfully');
+        setScoreSubmitted(true);
+      } else {
+        console.error('❌ Failed to save quiz score');
+      }
+    } catch (error) {
+      console.error('❌ Error submitting quiz score:', error);
+    } finally {
+      setSubmittingScore(false);
     }
   };
 
@@ -54,6 +106,8 @@ export function PracticeQuizViewer({ quiz }: PracticeQuizViewerProps) {
     setAnswers({});
     setShowAnswer(false);
     setQuizComplete(false);
+    setStartTime(Date.now());
+    setScoreSubmitted(false);
   };
 
   // Calculate score
@@ -71,35 +125,55 @@ export function PracticeQuizViewer({ quiz }: PracticeQuizViewerProps) {
 
   if (quizComplete) {
     return (
-      <Card>
-        <CardContent className="p-8 text-center">
-          <div className="space-y-6">
-            <div className="text-6xl mb-4">
-              {percentage >= 80 ? '🎉' : percentage >= 60 ? '👍' : '📚'}
-            </div>
-            <h3 className="text-3xl font-bold">Quiz Complete!</h3>
-            <div className="text-5xl font-bold text-blue-600">
-              {score} / {quiz.totalQuestions}
-            </div>
-            <p className="text-xl text-muted-foreground">
-              {percentage}% Correct
-            </p>
-            <div className="pt-4">
-              {percentage >= 80 ? (
-                <p className="text-green-600 font-semibold">Excellent work! 🌟</p>
-              ) : percentage >= 60 ? (
-                <p className="text-yellow-600 font-semibold">Good effort! Keep practicing! 💪</p>
-              ) : (
-                <p className="text-orange-600 font-semibold">Review the material and try again! 📖</p>
+      <div className="space-y-8">
+        {/* Quiz Results Card */}
+        <Card>
+          <CardContent className="p-6 sm:p-8 text-center">
+            <div className="space-y-6">
+              <div className="text-6xl mb-4">
+                {percentage >= 80 ? '🎉' : percentage >= 60 ? '👍' : '📚'}
+              </div>
+              <h3 className="text-2xl sm:text-3xl font-bold">Quiz Complete!</h3>
+              <div className="text-4xl sm:text-5xl font-bold text-blue-600">
+                {score} / {quiz.totalQuestions}
+              </div>
+              <p className="text-lg sm:text-xl text-muted-foreground">
+                {percentage}% Correct
+              </p>
+              <div className="pt-4">
+                {percentage >= 80 ? (
+                  <p className="text-green-600 font-semibold">Excellent work! 🌟</p>
+                ) : percentage >= 60 ? (
+                  <p className="text-yellow-600 font-semibold">Good effort! Keep practicing! 💪</p>
+                ) : (
+                  <p className="text-orange-600 font-semibold">Review the material and try again! 📖</p>
+                )}
+              </div>
+
+              {/* Score Submission Status */}
+              {submittingScore && (
+                <div className="flex items-center justify-center gap-2 text-sm text-gray-600">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>Saving your score...</span>
+                </div>
               )}
+              {scoreSubmitted && (
+                <div className="text-sm text-green-600 font-medium">
+                  ✅ Score saved to leaderboard!
+                </div>
+              )}
+
+              <Button onClick={resetQuiz} size="lg" className="mt-4">
+                <RotateCcw className="mr-2 h-5 w-5" />
+                Retake Quiz
+              </Button>
             </div>
-            <Button onClick={resetQuiz} size="lg" className="mt-4">
-              <RotateCcw className="mr-2 h-5 w-5" />
-              Retake Quiz
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+
+        {/* Leaderboard */}
+        <QuizLeaderboard queryId={queryId} />
+      </div>
     );
   }
 
@@ -127,10 +201,10 @@ export function PracticeQuizViewer({ quiz }: PracticeQuizViewerProps) {
 
       {/* Question */}
       <Card>
-        <CardContent className="p-6">
+        <CardContent className="p-4 sm:p-6">
           <div className="space-y-6">
             {/* Question Text */}
-            <h3 className="text-xl font-semibold leading-relaxed">
+            <h3 className="text-lg sm:text-xl font-semibold leading-relaxed">
               {currentQuestion.question}
             </h3>
 
@@ -143,7 +217,7 @@ export function PracticeQuizViewer({ quiz }: PracticeQuizViewerProps) {
                       key={index}
                       onClick={() => handleAnswer(option)}
                       disabled={showAnswer}
-                      className={`w-full text-left p-4 rounded-lg border-2 transition-colors ${
+                      className={`w-full text-left p-3 sm:p-4 rounded-lg border-2 transition-colors ${
                         showAnswer
                           ? option === currentQuestion.correctAnswer
                             ? 'border-green-500 bg-green-50'
@@ -156,15 +230,15 @@ export function PracticeQuizViewer({ quiz }: PracticeQuizViewerProps) {
                       }`}
                     >
                       <div className="flex items-center gap-3">
-                        <span className="font-semibold text-gray-500">
+                        <span className="font-semibold text-gray-500 flex-shrink-0">
                           {String.fromCharCode(65 + index)}.
                         </span>
-                        <span>{option}</span>
+                        <span className="text-sm sm:text-base">{option}</span>
                         {showAnswer && option === currentQuestion.correctAnswer && (
-                          <CheckCircle2 className="ml-auto h-5 w-5 text-green-600" />
+                          <CheckCircle2 className="ml-auto h-5 w-5 text-green-600 flex-shrink-0" />
                         )}
                         {showAnswer && option === userAnswer && option !== currentQuestion.correctAnswer && (
-                          <XCircle className="ml-auto h-5 w-5 text-red-600" />
+                          <XCircle className="ml-auto h-5 w-5 text-red-600 flex-shrink-0" />
                         )}
                       </div>
                     </button>
@@ -173,13 +247,13 @@ export function PracticeQuizViewer({ quiz }: PracticeQuizViewerProps) {
               )}
 
               {currentQuestion.type === 'true-false' && (
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-3 sm:gap-4">
                   {['True', 'False'].map((option) => (
                     <button
                       key={option}
                       onClick={() => handleAnswer(option)}
                       disabled={showAnswer}
-                      className={`p-4 rounded-lg border-2 font-semibold transition-colors ${
+                      className={`p-3 sm:p-4 rounded-lg border-2 font-semibold text-sm sm:text-base transition-colors ${
                         showAnswer
                           ? option === currentQuestion.correctAnswer
                             ? 'border-green-500 bg-green-50'
@@ -205,7 +279,7 @@ export function PracticeQuizViewer({ quiz }: PracticeQuizViewerProps) {
                     value={userAnswer || ''}
                     onChange={(e) => setAnswers({ ...answers, [currentQuestion.id]: e.target.value })}
                     disabled={showAnswer}
-                    className="w-full p-3 border-2 rounded-lg focus:outline-none focus:border-blue-500"
+                    className="w-full p-3 border-2 rounded-lg focus:outline-none focus:border-blue-500 text-sm sm:text-base"
                   />
                   {!showAnswer && (
                     <Button
@@ -222,25 +296,25 @@ export function PracticeQuizViewer({ quiz }: PracticeQuizViewerProps) {
 
             {/* Feedback */}
             {showAnswer && (
-              <div className={`p-4 rounded-lg ${
+              <div className={`p-3 sm:p-4 rounded-lg ${
                 isCorrect ? 'bg-green-50 border-2 border-green-200' : 'bg-red-50 border-2 border-red-200'
               }`}>
                 <div className="flex items-start gap-3">
                   {isCorrect ? (
-                    <CheckCircle2 className="h-6 w-6 text-green-600 flex-shrink-0 mt-0.5" />
+                    <CheckCircle2 className="h-5 w-5 sm:h-6 sm:w-6 text-green-600 flex-shrink-0 mt-0.5" />
                   ) : (
-                    <XCircle className="h-6 w-6 text-red-600 flex-shrink-0 mt-0.5" />
+                    <XCircle className="h-5 w-5 sm:h-6 sm:w-6 text-red-600 flex-shrink-0 mt-0.5" />
                   )}
                   <div className="space-y-2">
-                    <p className={`font-semibold ${isCorrect ? 'text-green-900' : 'text-red-900'}`}>
+                    <p className={`font-semibold text-sm sm:text-base ${isCorrect ? 'text-green-900' : 'text-red-900'}`}>
                       {isCorrect ? 'Correct!' : 'Incorrect'}
                     </p>
                     {!isCorrect && (
-                      <p className="text-sm text-red-800">
+                      <p className="text-xs sm:text-sm text-red-800">
                         <strong>Correct answer:</strong> {currentQuestion.correctAnswer}
                       </p>
                     )}
-                    <p className="text-sm text-gray-700">
+                    <p className="text-xs sm:text-sm text-gray-700">
                       {currentQuestion.explanation}
                     </p>
                   </div>

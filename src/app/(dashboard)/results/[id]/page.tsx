@@ -20,6 +20,9 @@ import { Prisma } from '@prisma/client';
 import { GenerateAudioButton } from '@/components/features/GenerateAudioButton';
 import { InteractiveConceptMapClickable } from '@/components/features/InteractiveConceptMap';
 import { InteractiveResultsView } from '@/components/features/InteractiveResultsView';
+import { ShareButton } from '@/components/social/ShareButton';
+import { CommentSection } from '@/components/social/CommentSection';
+import { SaveButton } from '@/components/features/SaveButton';
 
 export default async function ResultsPage({
   params,
@@ -43,12 +46,19 @@ export default async function ResultsPage({
       content: {
         orderBy: { generatedAt: 'asc' },
       },
+      savedByUsers: {
+        where: { userId: session.user.id },
+        take: 1,
+      },
     },
   });
 
   if (!query || query.userId !== session.user.id) {
     redirect('/explore');
   }
+  if (!query) redirect('/explore');
+
+  const isSaved = query.savedByUsers.length > 0;
 
   // Extract all content types
   const articleContent = query.content.find((c) => c.contentType === 'article');
@@ -151,18 +161,16 @@ export default async function ResultsPage({
           </div>
           
           {/* Remove Export/Share buttons - commented out for future use */}
-          {/* 
+          
           <div className="flex gap-2 mt-3">
-            <Button variant="outline" size="sm" className="gap-2">
-              <Download className="h-4 w-4" />
-              <span className="hidden sm:inline">Export</span>
-            </Button>
-            <Button variant="outline" size="sm" className="gap-2">
-              <Share2 className="h-4 w-4" />
-              <span className="hidden sm:inline">Share</span>
-            </Button>
+            <ShareButton 
+              contentId={query.id} 
+              contentType="query"
+              title={query.queryText}
+            />
+             <SaveButton queryId={query.id} isSaved={isSaved} />
           </div>
-          */}
+          
         </div>
       </div>
 
@@ -186,6 +194,9 @@ export default async function ResultsPage({
             articleText={articleText}
             queryId={id}
           />
+        </div>
+        <div className="mt-8">
+          <CommentSection sharedContentId={query.id} />
         </div>
       </div>
     </div>
