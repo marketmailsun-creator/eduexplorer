@@ -1,7 +1,6 @@
-import type { NextConfig } from "next";
-
-const nextConfig: NextConfig = {
-  output: 'standalone', // For Docker production builds
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  reactStrictMode: true,
   
   experimental: {
     serverActions: {
@@ -22,6 +21,14 @@ const nextConfig: NextConfig = {
   env: {
     NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
   },
+
+  // Webpack config for dev warnings
+  webpack: (config, { dev, isServer }) => {
+    if (dev && !isServer) {
+      config.devtool = 'eval-source-map';
+    }
+    return config;
+  },
 };
 
-export default nextConfig;
+module.exports = nextConfig;
