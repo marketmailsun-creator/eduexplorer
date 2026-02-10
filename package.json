@@ -29,8 +29,7 @@
     "@aws-sdk/client-s3": "^3.984.0",
     "@google/generative-ai": "^0.24.1",
     "@hookform/resolvers": "^5.2.2",
-    "@prisma/adapter-pg": "^7.3.0",
-    "@prisma/client": "^7.3.0",
+    "@prisma/client": "^6.3.0",
     "@radix-ui/react-avatar": "^1.1.11",
     "@radix-ui/react-dialog": "^1.1.15",
     "@radix-ui/react-dropdown-menu": "^2.1.16",
@@ -69,11 +68,7 @@
     "zustand": "^5.0.10",
     "tailwindcss": "^3.4.19",
     "postcss": "^8.5.6",
-    "autoprefixer": "^10.4.23"
-  },
-  "devDependencies": {
-    "@testing-library/jest-dom": "^6.9.1",
-    "@testing-library/react": "^16.3.2",
+    "autoprefixer": "^10.4.23",
     "@types/bcryptjs": "^3.0.0",
     "@types/jspdf": "^2.0.0",
     "@types/node": "^25.0.10",
@@ -81,12 +76,16 @@
     "@types/react": "^19.2.9",
     "@types/react-dom": "^19.2.3",
     "@types/web-push": "^3.6.4",
+    "typescript": "^5.9.3"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
     "babel-plugin-react-compiler": "1.0.0",
     "eslint": "^9.39.2",
     "eslint-config-next": "^16.1.4",
     "jest": "^30.2.0",
     "local-ssl-proxy": "^2.0.5",
-    "prisma": "^7.3.0",
-    "typescript": "^5.9.3"
+    "prisma": "^6.3.0"
   }
 }

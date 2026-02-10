@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { generateContentForQuery } from '@/lib/services/content.service';
 import { z } from 'zod';
-import prisma from '@/lib/db/prisma';
+import { prisma } from '@/lib/db/prisma';
 
 const generateSchema = z.object({
   queryId: z.string(),
