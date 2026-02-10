@@ -66,7 +66,10 @@
     "tsx": "^4.21.0",
     "web-push": "^3.6.7",
     "zod": "^4.3.5",
-    "zustand": "^5.0.10"
+    "zustand": "^5.0.10",
+    "tailwindcss": "^3.4.19",
+    "postcss": "^8.5.6",
+    "autoprefixer": "^10.4.23"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.9.1",
@@ -78,15 +81,12 @@
     "@types/react": "^19.2.9",
     "@types/react-dom": "^19.2.3",
     "@types/web-push": "^3.6.4",
-    "autoprefixer": "^10.4.23",
     "babel-plugin-react-compiler": "1.0.0",
     "eslint": "^9.39.2",
     "eslint-config-next": "^16.1.4",
     "jest": "^30.2.0",
     "local-ssl-proxy": "^2.0.5",
-    "postcss": "^8.5.6",
     "prisma": "^7.3.0",
-    "tailwindcss": "^3.4.19",
     "typescript": "^5.9.3"
   }
 }
