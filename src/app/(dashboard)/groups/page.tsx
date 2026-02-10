@@ -1,36 +1,78 @@
 import { auth } from '@/auth';
 import { redirect } from 'next/navigation';
-import { prisma } from '@/lib/db/prisma';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Users, Plus, Crown, Share2, UserPlus } from 'lucide-react';
+import { Plus, UserPlus, Users } from 'lucide-react';
 import Link from 'next/link';
+import GroupsList from './GroupsList';
+import { prisma } from '@/lib/db/prisma';
+
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
+// Define the group type
+interface GroupWithDetails {
+  id: string;
+  name: string;
+  description: string | null;
+  isPublic: boolean;
+  creatorName: string | null;
+  memberCount: number;
+  userRole: string;
+}
 
 export default async function GroupsPage() {
   const session = await auth();
-
-  if (!session?.user) {
+  if (!session?.user?.id) {
     redirect('/login');
   }
 
-  // Get user's groups
-  const userGroups = await prisma.studyGroupMember.findMany({
-    where: { userId: session.user.id },
+  // Fetch user's groups
+  const userGroups = await prisma.studyGroup.findMany({
+    where: {
+      members: {
+        some: {
+          userId: session.user.id,
+        },
+      },
+    },
     include: {
-      group: {
-        include: {
-          _count: {
-            select: { members: true },
-          },
+      creator: {
+        select: {
+          id: true,
+          name: true,
+          image: true,
+        },
+      },
+      _count: {
+        select: {
+          members: true,
+        },
+      },
+      members: {
+        where: {
+          userId: session.user.id,
+        },
+        select: {
+          role: true,
         },
       },
     },
     orderBy: {
-      joinedAt: 'desc',
+      createdAt: 'desc',
     },
   });
 
-  const groups = userGroups.map(ug => ug.group);
+  // Map to proper type
+  const groups: GroupWithDetails[] = userGroups.map((group: any) => ({
+    id: group.id,
+    name: group.name,
+    description: group.description,
+    isPublic: group.isPublic,
+    creatorName: group.creator.name,
+    memberCount: group._count.members,
+    userRole: group.members[0]?.role || 'member',
+  }));
 
   return (
     <div className="container mx-auto p-4 sm:p-6 max-w-6xl">
@@ -39,83 +81,41 @@ export default async function GroupsPage() {
         <p className="text-gray-600">Collaborate and learn with others</p>
       </div>
 
-      {/* Action Buttons */}
       <div className="flex gap-3 mb-6">
-        <Button asChild>
-          <Link href="/groups/create">
+        <Link href="/groups/create">
+          <Button>
             <Plus className="h-4 w-4 mr-2" />
             Create Group
-          </Link>
-        </Button>
-        <Button asChild variant="outline">
-          <Link href="/groups/join">
+          </Button>
+        </Link>
+        <Link href="/groups/join">
+          <Button variant="outline">
             <UserPlus className="h-4 w-4 mr-2" />
             Join Group
-          </Link>
-        </Button>
+          </Button>
+        </Link>
       </div>
 
-      {/* Groups List */}
       {groups.length === 0 ? (
         <Card>
-          <CardContent className="py-12 text-center">
+          <CardContent className="p-6 py-12 text-center">
             <Users className="h-16 w-16 mx-auto mb-4 text-gray-400" />
             <h3 className="text-xl font-semibold mb-2">No Groups Yet</h3>
             <p className="text-gray-600 mb-6">
               Create or join a study group to collaborate with others
             </p>
             <div className="flex justify-center gap-3">
-              <Button asChild>
-                <Link href="/groups/create">Create Group</Link>
-              </Button>
-              <Button asChild variant="outline">
-                <Link href="/groups/join">Join Group</Link>
-              </Button>
+              <Link href="/groups/create">
+                <Button>Create Group</Button>
+              </Link>
+              <Link href="/groups/join">
+                <Button variant="outline">Join Group</Button>
+              </Link>
             </div>
           </CardContent>
         </Card>
       ) : (
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {groups.map((group) => {
-            const isAdmin = userGroups.find(
-              ug => ug.groupId === group.id && ug.role === 'admin'
-            );
-
-            return (
-              <Card key={group.id} className="hover:shadow-lg transition-shadow">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-lg">
-                    {group.name}
-                    {isAdmin && <Crown className="h-4 w-4 text-yellow-500" />}
-                  </CardTitle>
-                  <p className="text-sm text-gray-600">
-                    {group._count.members} member{group._count.members !== 1 ? 's' : ''}
-                  </p>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-gray-700 mb-4 line-clamp-2">
-                    {group.description || 'No description'}
-                  </p>
-                  
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2 text-sm">
-                      <span className="text-gray-600">Code:</span>
-                      <code className="px-2 py-1 bg-gray-100 rounded text-purple-600 font-mono">
-                        {group.inviteCode}
-                      </code>
-                    </div>
-
-                    <Button asChild variant="outline" size="sm" className="w-full">
-                      <Link href={`/groups/${group.id}`}>
-                        View Group
-                      </Link>
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
+        <GroupsList groups={groups} />
       )}
     </div>
   );

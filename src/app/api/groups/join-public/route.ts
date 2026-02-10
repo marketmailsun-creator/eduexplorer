@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { prisma } from '@/lib/db/prisma';
 
 const joinSchema = z.object({
-  inviteCode: z.string().length(10, 'Invalid invite code'),
+  groupId: z.string(),
 });
 
 export const dynamic = 'force-dynamic';
@@ -17,13 +17,11 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    console.log('👤 Joining group:', { inviteCode: body.inviteCode });
+    const { groupId } = joinSchema.parse(body);
 
-    const { inviteCode } = joinSchema.parse(body);
-
-    // Find group by invite code
+    // Verify group exists and is public
     const group = await prisma.studyGroup.findUnique({
-      where: { inviteCode: inviteCode.toUpperCase() },
+      where: { id: groupId },
       include: {
         members: {
           where: { userId: session.user.id },
@@ -33,8 +31,15 @@ export async function POST(req: NextRequest) {
 
     if (!group) {
       return NextResponse.json(
-        { error: 'Invalid invite code. Please check and try again.' },
+        { error: 'Group not found' },
         { status: 404 }
+      );
+    }
+
+    if (!group.isPublic) {
+      return NextResponse.json(
+        { error: 'This group is private. Use an invite code to join.' },
+        { status: 403 }
       );
     }
 
@@ -55,40 +60,14 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    console.log('✅ User joined group successfully:', {
-      userId: session.user.id,
-      groupId: group.id,
-      groupName: group.name,
-    });
-
     return NextResponse.json({
       success: true,
-      group: {
-        id: group.id,
-        name: group.name,
-      },
       message: `Successfully joined ${group.name}!`,
     });
   } catch (error: any) {
-    console.error('❌ Join group error:', error);
-
-    if (error.name === 'ZodError') {
-      return NextResponse.json(
-        { error: 'Invalid invite code format' },
-        { status: 400 }
-      );
-    }
-
-    if (error.code === 'P2002') {
-      // Unique constraint - already a member
-      return NextResponse.json(
-        { error: 'You are already a member of this group' },
-        { status: 400 }
-      );
-    }
-
+    console.error('❌ Join public group error:', error);
     return NextResponse.json(
-      { error: 'Failed to join group', details: error.message },
+      { error: 'Failed to join group' },
       { status: 500 }
     );
   }
