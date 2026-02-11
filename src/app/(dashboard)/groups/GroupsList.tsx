@@ -23,12 +23,12 @@ interface GroupsListProps {
 }
 
 export default function GroupsList({ groups }: GroupsListProps) {
-  const router = useRouter();
+  //const router = useRouter();
 
   // Auto-refresh when component mounts
-  useEffect(() => {
-    router.refresh();
-  }, [router]);
+  // useEffect(() => {
+  //   router.refresh();
+  // }, [router]);
 
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
