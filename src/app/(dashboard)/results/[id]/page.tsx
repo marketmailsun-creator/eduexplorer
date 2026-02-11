@@ -23,6 +23,11 @@ import { InteractiveResultsView } from '@/components/features/InteractiveResults
 import { CommentSection } from '@/components/social/CommentSection';
 import { SaveButton } from '@/components/features/SaveButton';
 import ShareButton from '@/components/social/ShareButton';
+import { nanoid } from 'nanoid';
+
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+export const fetchCache = 'force-no-store';
 
 export default async function ResultsPage({
   params,
@@ -52,6 +57,25 @@ export default async function ResultsPage({
       },
     },
   });
+
+  let sharedContent = await prisma.sharedContent.findFirst({
+    where: {
+      queryId: id,
+      userId: session.user.id,
+    },
+  });
+
+  if (!sharedContent) {
+    console.log('✨ Creating SharedContent for comments...');
+    sharedContent = await prisma.sharedContent.create({
+      data: {
+        queryId: id,
+        userId: session.user.id,
+        shareType: 'public',
+        shareToken: nanoid(10),
+      },
+    });
+  }
 
   if (!query || query.userId !== session.user.id) {
     redirect('/explore');
@@ -195,7 +219,7 @@ export default async function ResultsPage({
           />
         </div>
         <div className="mt-8">
-          <CommentSection sharedContentId={query.id} />
+          <CommentSection sharedContentId={sharedContent.id} />
         </div>
       </div>
     </div>

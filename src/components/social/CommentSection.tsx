@@ -77,20 +77,34 @@ export function CommentSection({ sharedContentId }: CommentSectionProps) {
   };
 
   const likeComment = async (commentId: string) => {
-    if (!session) return;
-
     try {
-      await fetch('/api/comments/like', {
+      const response = await fetch('/api/comments/like', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ commentId }),
       });
 
-      fetchComments();
-    } catch (error) {
-      console.error('Failed to like comment:', error);
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to like comment');
+      }
+
+      console.log('✅ Like toggled:', data);
+
+      // Update local state
+      setComments((prevComments) =>
+        prevComments.map((comment: any) =>
+          comment.id === commentId
+            ? { ...comment, likes: data.likes, isLiked: data.liked }
+            : comment
+        )
+      );
+    } catch (error: any) {
+      console.error('❌ Like error:', error);
+      alert(error.message);
     }
-  };
+    };
 
   const formatTimeAgo = (dateString: string) => {
     const date = new Date(dateString);

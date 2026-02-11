@@ -256,6 +256,8 @@ model CommentLike {
 
   @@unique([commentId, userId])
   @@map("comment_likes")
+  @@index([commentId])
+  @@index([userId])
 }
 
 // Study Groups

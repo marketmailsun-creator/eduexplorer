@@ -4,6 +4,10 @@ import { prisma } from '@/lib/db/prisma';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Trophy, Medal, Award, TrendingUp } from 'lucide-react';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+export const fetchCache = 'force-no-store';
+
 export default async function LeaderboardPage() {
   const session = await auth();
 

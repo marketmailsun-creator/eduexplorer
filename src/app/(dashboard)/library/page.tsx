@@ -6,6 +6,10 @@ import { Button } from '@/components/ui/button';
 import { BookOpen, Bookmark } from 'lucide-react';
 import Link from 'next/link';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+export const fetchCache = 'force-no-store';
+
 export default async function LibraryPage() {
   const session = await auth();
   if (!session?.user) redirect('/login');

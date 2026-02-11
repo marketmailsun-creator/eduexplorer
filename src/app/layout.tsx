@@ -53,6 +53,31 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
          <Toaster />
        <RegisterServiceWorker />
        <MobileNav /> 
+
+       <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              if ('serviceWorker' in navigator && 'caches' in window) {
+                // Force service worker update
+                navigator.serviceWorker.getRegistrations().then(registrations => {
+                  registrations.forEach(registration => {
+                    registration.update();
+                  });
+                });
+                
+                // Clear any old caches
+                caches.keys().then(cacheNames => {
+                  cacheNames.forEach(cacheName => {
+                    if (!cacheName.includes('v3')) { // Match your CACHE_VERSION
+                      console.log('🗑️ Clearing old cache:', cacheName);
+                      caches.delete(cacheName);
+                    }
+                  });
+                });
+              }
+            `,
+          }}
+        />
       </body>
     </html>
   );
