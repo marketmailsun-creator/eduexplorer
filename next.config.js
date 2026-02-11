@@ -24,6 +24,25 @@ const nextConfig = {
     NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
   },
 
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: '**.elevenlabs.io',
+      },
+      {
+        protocol: 'https',
+        hostname: 'lh3.googleusercontent.com',
+      },
+      {
+        protocol: 'https',
+        hostname: '**.googleusercontent.com',
+      },
+    ],
+    // Don't fail on image load errors
+    dangerouslyAllowSVG: true,
+    unoptimized: false,
+  },
   // Headers for PWA
   async headers() {
     return [

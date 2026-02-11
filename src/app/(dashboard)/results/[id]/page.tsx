@@ -20,9 +20,9 @@ import { Prisma } from '@prisma/client';
 import { GenerateAudioButton } from '@/components/features/GenerateAudioButton';
 import { InteractiveConceptMapClickable } from '@/components/features/InteractiveConceptMap';
 import { InteractiveResultsView } from '@/components/features/InteractiveResultsView';
-import { ShareButton } from '@/components/social/ShareButton';
 import { CommentSection } from '@/components/social/CommentSection';
 import { SaveButton } from '@/components/features/SaveButton';
+import ShareButton from '@/components/social/ShareButton';
 
 export default async function ResultsPage({
   params,
@@ -61,13 +61,13 @@ export default async function ResultsPage({
   const isSaved = query.savedByUsers.length > 0;
 
   // Extract all content types
-  const articleContent = query.content.find((c) => c.contentType === 'article');
-  const audioContent = query.content.find((c) => c.contentType === 'audio');
-  const presentationContent = query.content.find((c) => c.contentType === 'presentation');
-  const flashcardContent = query.content.find((c) => c.contentType === 'flashcards');
-  const diagramContent = query.content.find((c) => c.contentType === 'diagrams');
-  const quizContent = query.content.find((c) => c.contentType === 'quiz');
-  const conceptMapContent = query.content.find((c) => c.contentType === 'concept-map');
+  const articleContent = query.content.find((c: any) => c.contentType === 'article');
+  const audioContent = query.content.find((c: any) => c.contentType === 'audio');
+  const presentationContent = query.content.find((c: any) => c.contentType === 'presentation');
+  const flashcardContent = query.content.find((c: any) => c.contentType === 'flashcards');
+  const diagramContent = query.content.find((c: any) => c.contentType === 'diagrams');
+  const quizContent = query.content.find((c: any) => c.contentType === 'quiz');
+  const conceptMapContent = query.content.find((c: any) => c.contentType === 'concept-map');
   
   const conceptMapData = conceptMapContent?.data || null;
   const article = articleContent?.data as any;
@@ -163,9 +163,8 @@ export default async function ResultsPage({
           {/* Remove Export/Share buttons - commented out for future use */}
           
           <div className="flex gap-2 mt-3">
-            <ShareButton 
-              contentId={query.id} 
-              contentType="query"
+            <ShareButton
+              queryId={query.id}
               title={query.queryText}
             />
              <SaveButton queryId={query.id} isSaved={isSaved} />

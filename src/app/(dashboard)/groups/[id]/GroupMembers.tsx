@@ -1,5 +1,6 @@
 'use client';
 
+import AvatarImage from '@/components/ui/avatar-image';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Users } from 'lucide-react';
 import Image from 'next/image';
@@ -36,13 +37,12 @@ export default function GroupMembers({ members, isAdmin }: GroupMembersProps) {
           {members.map((member: Member) => (
             <div key={member.id} className="flex items-center gap-3">
               {member.user.image ? (
-                <Image
-                  src={member.user.image}
-                  alt={member.user.name || 'User'}
-                  width={32}
-                  height={32}
-                  className="rounded-full"
-                />
+                <AvatarImage
+                src={member.user.image}
+                alt={member.user.name || 'User'}
+                size={32}
+                fallbackText={member.user.name || 'User'}
+              />
               ) : (
                 <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center">
                   <span className="text-purple-600 font-medium text-sm">

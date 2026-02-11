@@ -113,14 +113,14 @@ export function Header() {
                         <span className="text-sm">Upgrade to Pro</span>
                       </Link>
 
-                      <Link
+                      {/* <Link
                         href="/settings"
                         className="flex items-center gap-2 px-4 py-2 hover:bg-gray-100 transition-colors"
                         onClick={() => setShowDropdown(false)}
                       >
                         <Settings className="h-4 w-4" />
                         <span className="text-sm">Settings</span>
-                      </Link>
+                      </Link> */}
 
                       <hr className="my-2" />
 

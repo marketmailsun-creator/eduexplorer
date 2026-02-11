@@ -8,9 +8,9 @@ export function MobileNav() {
   const pathname = usePathname();
 
   const tabs = [
-    { href: '/', icon: Home, label: 'Home' },
     { href: '/explore', icon: Search, label: 'Explore' },
     { href: '/library', icon: BookOpen, label: 'Library' },
+    { href: '/groups', icon: User, label: 'Groups' },
     { href: '/profile', icon: User, label: 'Profile' },
   ];
 
