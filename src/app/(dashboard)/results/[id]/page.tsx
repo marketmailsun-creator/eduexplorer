@@ -24,6 +24,8 @@ import { CommentSection } from '@/components/social/CommentSection';
 import { SaveButton } from '@/components/features/SaveButton';
 import ShareButton from '@/components/social/ShareButton';
 import { nanoid } from 'nanoid';
+import { WhatToLearnNext } from '@/components/features/WhatToLearnNext';
+import { WhatsAppShareButton } from '@/components/features/WhatsAppShareButton';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -186,12 +188,14 @@ export default async function ResultsPage({
           
           {/* Remove Export/Share buttons - commented out for future use */}
           
-          <div className="flex gap-2 mt-3">
-            <ShareButton
+        <div className="flex gap-2 mt-3 flex-wrap">
+            <ShareButton queryId={query.id} title={query.queryText} />
+            <WhatsAppShareButton
+              topic={query.queryText}
+              summary={cleanText}
               queryId={query.id}
-              title={query.queryText}
             />
-             <SaveButton queryId={query.id} isSaved={isSaved} />
+            <SaveButton queryId={query.id} isSaved={isSaved} />
           </div>
           
         </div>
@@ -217,6 +221,9 @@ export default async function ResultsPage({
             articleText={articleText}
             queryId={id}
           />
+        </div>
+        <div className="px-4 sm:px-6 pb-10 max-w-7xl mx-auto">
+          <WhatToLearnNext queryId={id} currentTopic={query.queryText} />
         </div>
         <div className="mt-8">
           <CommentSection sharedContentId={sharedContent.id} />

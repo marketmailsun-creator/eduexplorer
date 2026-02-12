@@ -4,6 +4,9 @@ import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { LoadingProgressScreen } from '@/components/features/LoadingProgressScreen';
+import { useSearchParams } from 'next/navigation';
+import { OnboardingFlow } from '@/components/features/OnboardingFlow';
 import { 
   Loader2, 
   Camera, 
@@ -47,13 +50,19 @@ interface HistoryItem {
   topicDetected?: string;
 }
 
-export function SplitLayoutExplore() {
+interface SplitLayoutExploreProps {
+    onboardingDone?: boolean;
+    userName?: string;
+  }
+
+ export function SplitLayoutExplore({ onboardingDone = true, userName = '' }: SplitLayoutExploreProps={}) {
+
   const router = useRouter();
   const [query, setQuery] = useState('');
   const [level, setLevel] = useState('college');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  
+  const [showOnboarding, setShowOnboarding] = useState(!onboardingDone);
   // Media attachments
   const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
   const [isRecording, setIsRecording] = useState(false);
@@ -77,6 +86,9 @@ export function SplitLayoutExplore() {
   const audioChunksRef = useRef<Blob[]>([]);
   const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
 
+  const [loadingQuery, setLoadingQuery] = useState('');
+  const [hasMediaLoading, setHasMediaLoading] = useState(false);
+  
   // Load history when sidebar opens
   useEffect(() => {
     if (showHistory) {
@@ -84,6 +96,12 @@ export function SplitLayoutExplore() {
     }
   }, [showHistory]);
 
+  const searchParams = useSearchParams();
+   useEffect(() => {
+     const q = searchParams.get('q');
+     if (q) setQuery(decodeURIComponent(q));
+   }, [searchParams]);
+   
   // Load conversation history
   const loadHistory = async () => {
     setHistoryLoading(true);
@@ -193,7 +211,7 @@ export function SplitLayoutExplore() {
   };
 
   // Audio recording functions
-  const startRecording = async () => {
+ const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mediaRecorder = new MediaRecorder(stream);
@@ -205,14 +223,46 @@ export function SplitLayoutExplore() {
       };
 
       mediaRecorder.onstop = () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/wav' });
-        setAudioBlob(audioBlob);
-        setAudioURL(URL.createObjectURL(audioBlob));
+        const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        setAudioBlob(blob);
+        setAudioURL(URL.createObjectURL(blob));
         stream.getTracks().forEach(track => track.stop());
       };
 
       mediaRecorder.start();
       setIsRecording(true);
+
+      // ✅ Start live speech recognition WHILE recording
+      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      if (SpeechRecognition) {
+        const recognition = new SpeechRecognition();
+        recognition.lang = 'en-US';
+        recognition.continuous = true;       // Keep listening until stopped
+        recognition.interimResults = false;  // Only final results
+
+        recognition.onresult = (event: any) => {
+          const transcript = Array.from(event.results)
+            .map((result: any) => result[0].transcript)
+            .join(' ')
+            .trim();
+          if (transcript) {
+            setQuery(transcript);
+            console.log('🎤 Live transcribed:', transcript);
+          }
+        };
+
+        recognition.onerror = (event: any) => {
+          console.warn('⚠️ Speech recognition error:', event.error);
+        };
+
+        // Store recognition instance so we can stop it when recording stops
+        (mediaRecorderRef.current as any)._recognition = recognition;
+        recognition.start();
+        console.log('🎤 Live speech recognition started');
+      } else {
+        console.warn('⚠️ SpeechRecognition not supported in this browser');
+      }
+
     } catch (err) {
       console.error('Microphone error:', err);
       setError('Microphone access denied');
@@ -221,6 +271,12 @@ export function SplitLayoutExplore() {
 
   const stopRecording = () => {
     if (mediaRecorderRef.current && isRecording) {
+      // ✅ Stop speech recognition first
+      const recognition = (mediaRecorderRef.current as any)._recognition;
+      if (recognition) {
+        recognition.stop();
+        console.log('🎤 Speech recognition stopped');
+      }
       mediaRecorderRef.current.stop();
       setIsRecording(false);
     }
@@ -245,16 +301,42 @@ export function SplitLayoutExplore() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!query.trim()) return;
-
+    const hasMedia = attachedFiles.length > 0 || !!audioBlob;
+    if (!query.trim() && !hasMedia) {
+      setError('Please enter a question, or attach an image/file.');
+      return;
+    }
     setLoading(true);
+    setLoadingQuery(query || 'your attached content');
+    setHasMediaLoading(hasMedia);
     setError('');
+    console.log('📤 Submitting query...');
+    console.log('  - Query:', query);
+    console.log('  - Level:', level);
+    console.log('  - Files:', attachedFiles.length);
+    console.log('  - Audio:', audioBlob ? 'Yes' : 'No');
 
     try {
+      // ✅ Use FormData so files and audio are included
+      const formData = new FormData();
+      formData.append('query', query);
+      formData.append('learningLevel', level);
+
+      // Attach image/document files
+      attachedFiles.forEach((attachedFile) => {
+        formData.append('files', attachedFile.file);
+        console.log('  📎 Adding file:', attachedFile.file.name);
+      });
+
+      // Attach audio recording
+      if (audioBlob) {
+        formData.append('audio', audioBlob, 'recording.webm');
+        console.log('  🎤 Adding audio recording');
+      }
+
       const response = await fetch('/api/query/submit', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query, learningLevel: level }),
+        body: formData, // ✅ No Content-Type header — browser sets it with boundary
       });
 
       const data = await response.json();
@@ -263,11 +345,13 @@ export function SplitLayoutExplore() {
         throw new Error(data.error || 'Failed to submit query');
       }
 
+      console.log('✅ Query submitted successfully:', data.queryId);
       router.push(`/results/${data.queryId}`);
     } catch (err) {
+      console.error('❌ Submit error:', err);
       setError(err instanceof Error ? err.message : 'An error occurred');
-    } finally {
       setLoading(false);
+      setLoadingQuery('');
     }
   };
 
@@ -297,6 +381,17 @@ export function SplitLayoutExplore() {
     { icon: BarChart3, title: "Diagrams", color: "from-yellow-500 to-orange-500" },
     // { icon: Network, title: "Map", color: "from-teal-500 to-cyan-500" },
   ];
+  if (loading && loadingQuery) {
+      return <LoadingProgressScreen query={loadingQuery} hasMedia={hasMediaLoading} />;
+  }
+  if (showOnboarding) {
+      return (
+        <OnboardingFlow
+          userName={userName}
+          onComplete={() => setShowOnboarding(false)}
+        />
+      );
+    }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-purple-50 pb-16 md:pb-8">
@@ -336,10 +431,10 @@ export function SplitLayoutExplore() {
                   <Textarea
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
-                    placeholder="e.g., Explain quantum computing..."
+                    placeholder="Type your question, or attach an image/file and submit directly..."
                     className="min-h-[100px] sm:min-h-[120px] text-sm sm:text-base resize-none"
                     disabled={loading}
-                    required
+                    
                   />
                 </div>
 

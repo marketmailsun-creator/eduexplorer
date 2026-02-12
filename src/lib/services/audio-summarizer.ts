@@ -4,7 +4,7 @@ import { formatForAudio } from '../utils/text-formatter';
 const client = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
-
+const MODEL = 'claude-sonnet-4-5-20250929';
 interface AudioSummaryOptions {
   text: string;
   maxDurationMinutes?: number;
@@ -29,7 +29,7 @@ export async function generateAudioSummary(
 
   try {
     const message = await client.messages.create({
-      model: 'claude-sonnet-4-20250514',
+      model: MODEL,
       max_tokens: 2000,
       system: `You are an expert at creating concise, engaging audio summaries for educational content. 
 Your summaries are optimized for text-to-speech and listening comprehension.`,

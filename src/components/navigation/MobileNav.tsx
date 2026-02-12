@@ -1,6 +1,6 @@
 'use client';
 
-import { Home, Search, BookOpen, User } from 'lucide-react';
+import { Home, Search, BookOpen, TrendingUp, User } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
@@ -10,6 +10,7 @@ export function MobileNav() {
   const tabs = [
     { href: '/explore', icon: Search, label: 'Explore' },
     { href: '/library', icon: BookOpen, label: 'Library' },
+    { href: '/progress',  icon: TrendingUp,  label: 'Progress' },  // ← NEW
     { href: '/groups', icon: User, label: 'Groups' },
     { href: '/profile', icon: User, label: 'Profile' },
   ];

@@ -3,7 +3,7 @@ import Anthropic from '@anthropic-ai/sdk';
 const client = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
-
+const MODEL = 'claude-sonnet-4-5-20250929';
 interface ModerationResult {
   isAppropriate: boolean;
   reason?: string;
@@ -27,7 +27,7 @@ export async function moderateContent(
       : 'The user is an adult, but still filter inappropriate content.';
 
     const message = await client.messages.create({
-      model: 'claude-sonnet-4-20250514',
+      model: MODEL,
       max_tokens: 500,
       system: `You are a content moderation system for an educational platform. Your job is to determine if a user's query is appropriate for educational content generation.
 

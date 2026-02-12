@@ -90,6 +90,8 @@ model User {
   razorpayOrderId       String?
   razorpayPaymentId     String?
   razorpaySubscriptionId String?  @unique 
+
+  onboardingDone Boolean @default(false)
   
   pushSubscriptions PushSubscription[]
   subscription Subscription[]

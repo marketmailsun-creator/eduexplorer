@@ -37,6 +37,12 @@ export function Header() {
                 </Link>
               </Button>
               <Button variant="ghost" size="sm" asChild>
+                <Link href="/progress">
+                  <BookOpen className="h-4 w-4 mr-1" />
+                  Progress
+                </Link>
+              </Button>
+              <Button variant="ghost" size="sm" asChild>
                 <Link href="/groups">
                   <Users className="h-4 w-4 mr-1" />
                   Groups

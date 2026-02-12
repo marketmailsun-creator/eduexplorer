@@ -3,7 +3,7 @@ import Anthropic from '@anthropic-ai/sdk';
 const client = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
-
+const MODEL = 'claude-sonnet-4-5-20250929';
 export interface ResearchResult {
   content: string;
   sources: Array<{
@@ -20,7 +20,7 @@ export async function researchTopic(
   learningLevel: string = 'college'
 ): Promise<ResearchResult> {
   const message = await client.messages.create({
-    model: 'claude-sonnet-4-20250514',
+    model: MODEL,
     max_tokens: 4000,
     tools: [
       {
@@ -70,7 +70,7 @@ export async function generateArticle(
   learningLevel: string = 'college'
 ): Promise<string> {
   const message = await client.messages.create({
-    model: 'claude-sonnet-4-20250514',
+    model: MODEL,
     max_tokens: 8000,
     system: getSystemPrompt(learningLevel),
     messages: [

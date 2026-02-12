@@ -3,7 +3,7 @@ import Anthropic from '@anthropic-ai/sdk';
 const client = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
-
+const MODEL = 'claude-sonnet-4-5-20250929';
 interface VideoScriptOptions {
   articleText: string;
   topic: string;
@@ -28,7 +28,7 @@ export async function generateVideoScript(
   const maxWords = maxDuration * targetWords;
 
   const message = await client.messages.create({
-    model: 'claude-sonnet-4-20250514',
+    model: MODEL,
     max_tokens: 2000,
     system: `You are an educational video script writer. Create engaging, concise scripts suitable for AI avatar narration.`,
     messages: [
@@ -137,7 +137,7 @@ export function estimateScriptDuration(script: string): number {
  */
 export async function generateKeyPoints(articleText: string, topic: string): Promise<string[]> {
   const message = await client.messages.create({
-    model: 'claude-sonnet-4-20250514',
+    model: MODEL,
     max_tokens: 1000,
     messages: [
       {
