@@ -3,8 +3,9 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { CheckCircle2, XCircle, ChevronRight, RotateCcw, Loader2 } from 'lucide-react';
+import { CheckCircle2, XCircle, ChevronRight, RotateCcw, Loader2, ArrowRight } from 'lucide-react';
 import { QuizLeaderboard } from '@/components/social/QuizLeaderboard';
+
 
 interface PracticeQuestion {
   id: number;
@@ -91,6 +92,13 @@ export function PracticeQuizViewer({ quiz, queryId }: PracticeQuizViewerProps) {
       if (response.ok) {
         console.log('✅ Quiz score saved successfully');
         setScoreSubmitted(true);
+
+        // ✅ Schedule spaced repetition reminders (day 3 + day 7)
+        fetch('/api/quiz/schedule-reminders', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ queryId }),
+        }).catch(() => {});
       } else {
         console.error('❌ Failed to save quiz score');
       }
@@ -125,51 +133,97 @@ export function PracticeQuizViewer({ quiz, queryId }: PracticeQuizViewerProps) {
 
   if (quizComplete) {
     return (
-      <div className="space-y-8">
-        {/* Quiz Results Card */}
-        <Card>
-          <CardContent className="p-6 sm:p-8 text-center">
-            <div className="space-y-6">
-              <div className="text-6xl mb-4">
-                {percentage >= 80 ? '🎉' : percentage >= 60 ? '👍' : '📚'}
-              </div>
-              <h3 className="text-2xl sm:text-3xl font-bold">Quiz Complete!</h3>
-              <div className="text-4xl sm:text-5xl font-bold text-blue-600">
-                {score} / {quiz.totalQuestions}
-              </div>
-              <p className="text-lg sm:text-xl text-muted-foreground">
-                {percentage}% Correct
-              </p>
-              <div className="pt-4">
-                {percentage >= 80 ? (
-                  <p className="text-green-600 font-semibold">Excellent work! 🌟</p>
-                ) : percentage >= 60 ? (
-                  <p className="text-yellow-600 font-semibold">Good effort! Keep practicing! 💪</p>
-                ) : (
-                  <p className="text-orange-600 font-semibold">Review the material and try again! 📖</p>
-                )}
-              </div>
-
-              {/* Score Submission Status */}
-              {submittingScore && (
-                <div className="flex items-center justify-center gap-2 text-sm text-gray-600">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  <span>Saving your score...</span>
-                </div>
-              )}
-              {scoreSubmitted && (
-                <div className="text-sm text-green-600 font-medium">
-                  ✅ Score saved to leaderboard!
-                </div>
-              )}
-
-              <Button onClick={resetQuiz} size="lg" className="mt-4">
-                <RotateCcw className="mr-2 h-5 w-5" />
-                Retake Quiz
-              </Button>
+      <div className="space-y-6">
+        {/* Celebration Card */}
+        <div className="rounded-2xl overflow-hidden shadow-lg">
+          {/* Gradient Header */}
+          <div className={
+            "p-8 text-center text-white " +
+            (percentage >= 80
+              ? "bg-gradient-to-br from-green-500 to-emerald-600"
+              : percentage >= 60
+              ? "bg-gradient-to-br from-yellow-500 to-orange-500"
+              : "bg-gradient-to-br from-blue-500 to-indigo-600")
+          }>
+            {/* Big emoji */}
+            <div className="text-7xl mb-3 animate-bounce">
+              {percentage >= 80 ? "🎉" : percentage >= 60 ? "💪" : "📚"}
             </div>
-          </CardContent>
-        </Card>
+
+            <h3 className="text-2xl font-bold mb-1">
+              {percentage >= 80 ? "Outstanding!" : percentage >= 60 ? "Nice Work!" : "Keep Practising!"}
+            </h3>
+
+            {/* Score */}
+            <div className="flex items-center justify-center gap-2 mt-4">
+              <span className="text-6xl font-extrabold">{percentage}%</span>
+            </div>
+            <p className="text-white/80 mt-1 text-sm">
+              {score} of {quiz.totalQuestions} correct
+            </p>
+          </div>
+
+          {/* Stats Row */}
+          <div className="bg-white grid grid-cols-3 divide-x border-t">
+            <div className="text-center py-4 px-2">
+              <p className="text-xl font-bold text-gray-900">{score}/{quiz.totalQuestions}</p>
+              <p className="text-xs text-gray-400 mt-0.5">Score</p>
+            </div>
+            <div className="text-center py-4 px-2">
+              <p className="text-xl font-bold text-gray-900">
+                {Math.floor((Date.now() - startTime) / 60000)}m
+              </p>
+              <p className="text-xs text-gray-400 mt-0.5">Time</p>
+            </div>
+            <div className="text-center py-4 px-2">
+              <p className="text-xl font-bold text-gray-900">
+                {quiz.questions.filter(q => q.difficulty === "hard" &&
+                  answers[q.id]?.toLowerCase().trim() === q.correctAnswer.toLowerCase().trim()
+                ).length}
+              </p>
+              <p className="text-xs text-gray-400 mt-0.5">Hard ✓</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Spaced repetition notice */}
+        <div className="flex items-start gap-3 px-4 py-3 rounded-xl bg-indigo-50 border border-indigo-100">
+          <span className="text-2xl">⏰</span>
+          <div>
+            <p className="text-sm font-semibold text-indigo-800">Reminders scheduled</p>
+            <p className="text-xs text-indigo-600 mt-0.5">
+              We'll remind you to review this topic again in 3 days and 7 days for best retention.
+            </p>
+          </div>
+        </div>
+
+        {/* Score save status */}
+        {submittingScore && (
+          <div className="flex items-center justify-center gap-2 text-sm text-gray-500">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Saving your score...
+          </div>
+        )}
+        {scoreSubmitted && (
+          <p className="text-center text-sm text-green-600 font-medium">
+            ✅ Score saved to leaderboard!
+          </p>
+        )}
+
+        {/* Action Buttons */}
+        <div className="grid grid-cols-2 gap-3">
+          <Button onClick={resetQuiz} variant="outline" className="h-11">
+            <RotateCcw className="h-4 w-4 mr-2" />
+            Try Again
+          </Button>
+          <Button
+            onClick={() => window.location.href = "/explore"}
+            className="h-11 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700"
+          >
+            Learn More
+            <ArrowRight className="h-4 w-4 ml-2" />
+          </Button>
+        </div>
 
         {/* Leaderboard */}
         <QuizLeaderboard queryId={queryId} />

@@ -97,6 +97,8 @@ model User {
   subscription Subscription[]
   savedQueries      SavedQuery[]
 
+  quizReviewReminders QuizReviewReminder[]
+
   @@map("users")
 }
 
@@ -111,6 +113,7 @@ model UserPreferences {
   preferredVoice  String  @default("professional")
   autoAudio       Boolean @default(false)
   theme           String  @default("light")
+  dailyGoal       Int     @default(1)   // ← NEW: topics per day target (1, 2, or 3)
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -130,6 +133,8 @@ model Query {
   researchData ResearchData?
   content      Content[]
   sharedContent SharedContent[]
+
+  quizReviewReminders QuizReviewReminder[]
 
   quizScores         QuizScore[]
   savedByUsers      SavedQuery[]
@@ -394,4 +399,22 @@ model SavedQuery {
   @@index([userId])
   @@index([queryId])
   @@map("saved_queries")
+}
+
+model QuizReviewReminder {
+  id         String   @id @default(cuid())
+  userId     String
+  queryId    String
+  sendAt     DateTime
+  dayNumber  Int      // 3 or 7
+  sent       Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  query Query @relation(fields: [queryId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, queryId, dayNumber])
+  @@index([sendAt])
+  @@index([userId])
+  @@map("quiz_review_reminders")
 }

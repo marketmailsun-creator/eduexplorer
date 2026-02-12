@@ -474,7 +474,7 @@ export function InteractiveResultsView({
         </Card>
 
         {/* Quiz <Card className={`${getCardClass(quizSize)} transition-all`}>*/}
-        <Card className="w-full">
+        <Card id="quiz-section" className="w-full">
           <CardHeader className="pb-3 px-4">
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center gap-2 text-base">
@@ -563,7 +563,7 @@ export function InteractiveResultsView({
           {flashcardsSize !== 'minimized' && (
             <CardContent>
               {hasFlashcards ? (
-                <FlashcardViewer deck={flashcardData.deck} />
+                <FlashcardViewer deck={flashcardData.deck} deckId={flashcardData.deckId} />
               ) : (
                 <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed">
                   <Layers className="h-16 w-16 mx-auto mb-4 text-gray-400" />

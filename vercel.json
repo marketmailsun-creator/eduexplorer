@@ -38,6 +38,14 @@
           "value": "public, max-age=31536000, immutable"
         }
       ]
+    },
+    {
+    "crons": [
+        {
+          "path": "/api/cron/send-reminders",
+          "schedule": "0 12 * * *"
+        }
+      ]
     }
   ]
 }

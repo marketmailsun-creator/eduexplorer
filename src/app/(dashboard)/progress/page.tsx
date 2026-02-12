@@ -7,6 +7,7 @@
 
 import { useEffect, useState } from 'react';
 import { Flame, BookOpen, Brain, TrendingUp, Trophy, Target, Calendar, Star, Zap } from 'lucide-react';
+import { DailyGoalWidget } from '@/components/features/DailyGoalWidget';
 
 interface ProgressData {
   streak: number;
@@ -82,6 +83,8 @@ export default function ProgressPage() {
             </div>
           </div>
         </div>
+        
+        <DailyGoalWidget />
 
         {/* Stats row */}
         <div className="grid grid-cols-2 gap-3">

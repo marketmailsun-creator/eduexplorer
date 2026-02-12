@@ -1,3 +1,8 @@
+// ============================================================
+// FILE: src/app/api/user/preferences/route.ts  (REPLACE EXISTING)
+// Adds dailyGoal to the accepted preference fields.
+// ============================================================
+
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db/prisma';
@@ -8,6 +13,7 @@ const preferencesSchema = z.object({
   preferredVoice: z.string().optional(),
   autoAudio: z.boolean().optional(),
   theme: z.string().optional(),
+  dailyGoal: z.number().int().min(1).max(10).optional(), // ← NEW
 });
 
 export async function GET() {
@@ -22,11 +28,8 @@ export async function GET() {
     });
 
     if (!preferences) {
-      // Create default preferences
       const newPreferences = await prisma.userPreferences.create({
-        data: {
-          userId: session.user.id,
-        },
+        data: { userId: session.user.id },
       });
       return NextResponse.json(newPreferences);
     }
@@ -34,10 +37,7 @@ export async function GET() {
     return NextResponse.json(preferences);
   } catch (error) {
     console.error('Get preferences error:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch preferences' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Failed to fetch preferences' }, { status: 500 });
   }
 }
 
@@ -53,26 +53,16 @@ export async function PATCH(req: NextRequest) {
 
     const preferences = await prisma.userPreferences.upsert({
       where: { userId: session.user.id },
-      create: {
-        userId: session.user.id,
-        ...updates,
-      },
+      create: { userId: session.user.id, ...updates },
       update: updates,
     });
 
     return NextResponse.json(preferences);
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        { error: 'Invalid input', details: error.issues },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Invalid input', details: error.issues }, { status: 400 });
     }
-
     console.error('Update preferences error:', error);
-    return NextResponse.json(
-      { error: 'Failed to update preferences' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Failed to update preferences' }, { status: 500 });
   }
 }

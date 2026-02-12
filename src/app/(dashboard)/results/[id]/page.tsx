@@ -223,7 +223,7 @@ export default async function ResultsPage({
           />
         </div>
         <div className="px-4 sm:px-6 pb-10 max-w-7xl mx-auto">
-          <WhatToLearnNext queryId={id} currentTopic={query.queryText} />
+          <WhatToLearnNext queryId={id} currentTopic={query.queryText}  hasQuiz={hasQuiz}  />
         </div>
         <div className="mt-8">
           <CommentSection sharedContentId={sharedContent.id} />
