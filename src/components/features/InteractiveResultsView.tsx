@@ -79,6 +79,12 @@ export function InteractiveResultsView({
   const [presentationSize, setPresentationSize] = useState<CardSize>('normal');
   const [flashcardsSize, setFlashcardsSize] = useState<CardSize>('normal');
   const [quizSize, setQuizSize] = useState<CardSize>('normal');
+  //const quizSets = query.content.filter(c => c.contentType === 'quiz');
+  const quizSets = query.content.filter(
+      (c: { contentType: string }) => c.contentType === "quiz"
+    );
+
+  const latestQuiz = quizSets[quizSets.length - 1]; // use the most recent
 
   // Download PDF function
   const handleDownloadPDF = () => {
@@ -512,7 +518,7 @@ export function InteractiveResultsView({
           {quizSize !== 'minimized' && (
             <CardContent>
               {hasQuiz && quiz ? (
-                <PracticeQuizViewer quiz={quiz} queryId={query.id} />
+                <PracticeQuizViewer quiz={quiz} queryId={query.id} totalSets={quizSets.length}/>
               ) : (
                 <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed">
                   <Brain className="h-16 w-16 mx-auto mb-4 text-gray-400" />

@@ -114,6 +114,7 @@ model UserPreferences {
   autoAudio       Boolean @default(false)
   theme           String  @default("light")
   dailyGoal       Int     @default(1)   // ← NEW: topics per day target (1, 2, or 3)
+  notifPrefs      Json?   // ← NEW: stores notification toggle states
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 

@@ -1,3 +1,14 @@
+// ============================================================
+// FILE: src/lib/services/practice-questions-generator.ts — REPLACE EXISTING
+// Key changes:
+//   • generateTopicQuiz() — generates questions from the TOPIC alone
+//     (not from article text) so questions are broader & more random
+//   • Accepts previousQuestions[] to explicitly exclude similar ones
+//   • setNumber seed gives different angle each time ("Set 2: focus on
+//     applications", "Set 3: focus on misconceptions" etc.)
+//   • generatePracticeQuestions() kept for backwards compat
+// ============================================================
+
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { cleanForJSON } from '../utils/text-cleaning-utils';
 
@@ -20,201 +31,160 @@ export interface PracticeQuiz {
   level: string;
   totalQuestions: number;
   questions: PracticeQuestion[];
+  setNumber?: number;
+  generatedAt?: string;
+}
+
+// Different focus areas for each quiz set — keeps questions fresh
+const SET_FOCUSES = [
+  'core concepts, definitions, and fundamental principles',
+  'real-world applications, examples, and practical uses',
+  'common misconceptions, edge cases, and "why" questions',
+  'historical context, development, and key figures or events',
+  'comparisons, relationships between concepts, and synthesis',
+  'critical thinking, analysis, and problem-solving scenarios',
+];
+
+/**
+ * PRIMARY: Generate a quiz based purely on TOPIC (no article needed).
+ * This produces diverse, non-repetitive questions across regenerations.
+ */
+export async function generateTopicQuiz(
+  topic: string,
+  count: number = 10,
+  level: string = 'college',
+  previousQuestions: string[] = [],
+  setNumber: number = 1,
+): Promise<PracticeQuiz> {
+
+  if (!genAI) {
+    console.warn('⚠️ GOOGLE_API_KEY not set, using fallback');
+    return generateFallbackTopicQuestions(topic, count, level, setNumber);
+  }
+
+  const focusArea = SET_FOCUSES[(setNumber - 1) % SET_FOCUSES.length];
+  const prevBlock = previousQuestions.length > 0
+    ? `\n\nIMPORTANT - Do NOT generate questions similar to these already-asked questions:\n${previousQuestions.slice(-30).map((q, i) => `${i + 1}. ${q}`).join('\n')}\n`
+    : '';
+
+  const prompt = `You are an expert educator creating a practice quiz (Set #${setNumber}) about "${topic}" for ${level}-level students.
+
+This set should focus specifically on: ${focusArea}
+${prevBlock}
+Generate exactly ${count} fresh questions. Mix these types:
+- multiple-choice (4 options, 1 correct) — 50%
+- true-false — 20%
+- fill-blank — 20%
+- short-answer — 10%
+
+Difficulty mix: 30% easy, 50% medium, 20% hard
+
+Rules:
+1. Questions must test UNDERSTANDING, not just recall
+2. Make distractors plausible (not obviously wrong)
+3. Cover different subtopics within "${topic}"
+4. Do NOT repeat any question from the excluded list above
+
+Return ONLY valid JSON (no markdown, no backticks):
+{
+  "topic": "${topic}",
+  "level": "${level}",
+  "setNumber": ${setNumber},
+  "totalQuestions": ${count},
+  "generatedAt": "${new Date().toISOString()}",
+  "questions": [
+    {
+      "id": 1,
+      "question": "...",
+      "type": "multiple-choice",
+      "difficulty": "medium",
+      "options": ["Option A", "Option B", "Option C", "Option D"],
+      "correctAnswer": "Option A",
+      "explanation": "Because...",
+      "category": "concept"
+    }
+  ]
+}`;
+
+  try {
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+    const result = await model.generateContent(prompt);
+    const text = result.response.text();
+
+    // Strip markdown fences if present
+    const cleaned = text.replace(/```json|```/g, '').trim();
+    const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error('No JSON in response');
+
+    const quiz: PracticeQuiz = JSON.parse(jsonMatch[0]);
+    quiz.setNumber = setNumber;
+    quiz.generatedAt = new Date().toISOString();
+
+    console.log(`✅ Quiz Set ${setNumber}: ${quiz.questions.length} questions generated for "${topic}"`);
+    return quiz;
+
+  } catch (error: any) {
+    console.error('❌ Quiz generation error:', error.message);
+    return generateFallbackTopicQuestions(topic, count, level, setNumber);
+  }
 }
 
 /**
- * Generate practice questions from article
+ * FALLBACK: Generate reasonable questions from topic name alone
+ * (used when AI is unavailable)
+ */
+function generateFallbackTopicQuestions(
+  topic: string,
+  count: number,
+  level: string,
+  setNumber: number,
+): PracticeQuiz {
+  const questions: PracticeQuestion[] = [];
+  const baseTemplates = [
+    { q: `What is the primary purpose of ${topic}?`, type: 'short-answer' as const, diff: 'easy' as const, cat: 'definition' },
+    { q: `Which of the following best describes ${topic}?`, type: 'multiple-choice' as const, diff: 'easy' as const, cat: 'concept' },
+    { q: `${topic} was developed primarily to solve real-world problems.`, type: 'true-false' as const, diff: 'easy' as const, cat: 'fact' },
+    { q: `What are the key components that make up ${topic}?`, type: 'short-answer' as const, diff: 'medium' as const, cat: 'concept' },
+    { q: `How does ${topic} differ from related approaches?`, type: 'short-answer' as const, diff: 'medium' as const, cat: 'comparison' },
+    { q: `The main limitation of ${topic} is ___.`, type: 'fill-blank' as const, diff: 'medium' as const, cat: 'application' },
+    { q: `In practice, ${topic} is most commonly used for ___.`, type: 'fill-blank' as const, diff: 'medium' as const, cat: 'application' },
+    { q: `${topic} requires specialized knowledge to implement correctly.`, type: 'true-false' as const, diff: 'medium' as const, cat: 'fact' },
+    { q: `What would happen if the core principle of ${topic} were removed?`, type: 'short-answer' as const, diff: 'hard' as const, cat: 'analysis' },
+    { q: `How has ${topic} evolved over time?`, type: 'short-answer' as const, diff: 'hard' as const, cat: 'history' },
+  ];
+
+  const templateOffset = (setNumber - 1) * 3;
+  for (let i = 0; i < Math.min(count, baseTemplates.length); i++) {
+    const t = baseTemplates[(i + templateOffset) % baseTemplates.length];
+    questions.push({
+      id: i + 1,
+      question: t.q,
+      type: t.type,
+      difficulty: t.diff,
+      options: t.type === 'multiple-choice'
+        ? [`Core aspect of ${topic}`, `Peripheral use of ${topic}`, 'Neither applies', 'Both apply']
+        : undefined,
+      correctAnswer: t.type === 'multiple-choice' ? `Core aspect of ${topic}`
+        : t.type === 'true-false' ? 'True'
+        : `This depends on the specific context of ${topic}.`,
+      explanation: `This tests understanding of ${topic} from a ${t.cat} perspective.`,
+      category: t.cat,
+    });
+  }
+
+  return { topic, level, totalQuestions: questions.length, questions, setNumber, generatedAt: new Date().toISOString() };
+}
+
+/**
+ * LEGACY: Original function kept for backward compatibility.
+ * New code should use generateTopicQuiz() instead.
  */
 export async function generatePracticeQuestions(
   topic: string,
   articleText: string,
   count: number = 10,
-  level: string = 'college'
+  level: string = 'college',
 ): Promise<PracticeQuiz> {
-
-  const cleanedText = cleanForJSON(articleText);
-
-  if (!genAI) {
-    console.warn('⚠️ GOOGLE_API_KEY not set, using fallback');
-    return generateFallbackQuestions(topic, articleText, count, level);
-  }
-
-  console.log('═══════════════════════════════════════════════');
-  console.log('❓ GENERATING PRACTICE QUESTIONS');
-  console.log('═══════════════════════════════════════════════');
-  console.log(`Topic: ${topic}`);
-  console.log(`Count: ${count}`);
-  console.log(`Level: ${level}`);
-
-  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
-
-  const prompt = `Create ${count} practice questions about "${topic}" for ${level} level students.
-
-Content to base questions on:
-${cleanedText.substring(0, 4000)}
-
-Generate diverse question types:
-- Multiple choice (4 options, 1 correct)
-- True/False
-- Short answer
-- Fill in the blank
-
-Mix difficulty levels: 40% easy, 40% medium, 20% hard
-
-Return ONLY valid JSON:
-{
-  "topic": "${topic}",
-  "level": "${level}",
-  "totalQuestions": ${count},
-  "questions": [
-    {
-      "id": 1,
-      "question": "What is the main function of chlorophyll in photosynthesis?",
-      "type": "multiple-choice",
-      "difficulty": "easy",
-      "options": ["Absorb light energy", "Store glucose", "Release oxygen", "Break down water"],
-      "correctAnswer": "Absorb light energy",
-      "explanation": "Chlorophyll absorbs light energy from the sun, which is the first step in photosynthesis.",
-      "category": "concept"
-    },
-    {
-      "id": 2,
-      "question": "Photosynthesis only occurs during the day.",
-      "type": "true-false",
-      "difficulty": "easy",
-      "correctAnswer": "True",
-      "explanation": "Photosynthesis requires light energy, so it only occurs when light is available.",
-      "category": "fact"
-    },
-    {
-      "id": 3,
-      "question": "The chemical equation for photosynthesis is ___ + 6H2O + light → C6H12O6 + 6O2",
-      "type": "fill-blank",
-      "difficulty": "medium",
-      "correctAnswer": "6CO2",
-      "explanation": "Six molecules of carbon dioxide are needed along with water and light to produce glucose and oxygen.",
-      "category": "process"
-    },
-    {
-      "id": 4,
-      "question": "Explain the difference between light-dependent and light-independent reactions.",
-      "type": "short-answer",
-      "difficulty": "hard",
-      "correctAnswer": "Light-dependent reactions occur in thylakoids and require light to produce ATP and NADPH. Light-independent reactions (Calvin cycle) occur in stroma and use ATP and NADPH to produce glucose.",
-      "explanation": "These are the two main stages of photosynthesis with different locations and requirements.",
-      "category": "process"
-    }
-  ]
-}
-
-Generate the questions now:`;
-
-  try {
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const text = response.text();
-
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      console.warn('⚠️ No JSON found, using fallback');
-      return generateFallbackQuestions(topic, articleText, count, level);
-    }
-
-    const quiz: PracticeQuiz = JSON.parse(jsonMatch[0]);
-    
-    console.log(`✅ Generated ${quiz.totalQuestions} practice questions`);
-    quiz.questions.forEach((q, idx) => {
-      console.log(`  ${idx + 1}. [${q.difficulty}] ${q.type}: ${q.question.substring(0, 50)}...`);
-    });
-
-    return quiz;
-  } catch (error: any) {
-    console.error('❌ Question generation error:', error.message);
-    return generateFallbackQuestions(topic, articleText, count, level);
-  }
-}
-
-/**
- * Fallback: Generate basic questions from content
- */
-function generateFallbackQuestions(
-  topic: string,
-  content: string,
-  count: number,
-  level: string
-): PracticeQuiz {
-  
-  const sentences = content.split(/[.!?]+/).filter(s => s.trim().length > 30);
-  const questions: PracticeQuestion[] = [];
-
-  // Question 1: What is X?
-  questions.push({
-    id: 1,
-    question: `What is ${topic}?`,
-    type: 'short-answer',
-    difficulty: 'easy',
-    correctAnswer: sentences[0]?.trim() || `${topic} is the main subject of this content.`,
-    explanation: 'This is the fundamental definition.',
-    category: 'definition',
-  });
-
-  // Question 2: True/False
-  if (sentences.length > 1) {
-    questions.push({
-      id: 2,
-      question: `True or False: ${sentences[1]?.trim()}`,
-      type: 'true-false',
-      difficulty: 'easy',
-      correctAnswer: 'True',
-      explanation: 'This statement is directly from the content.',
-      category: 'fact',
-    });
-  }
-
-  // Question 3-5: Multiple choice from content
-  for (let i = 0; i < 3 && sentences.length > i + 2; i++) {
-    const sentence = sentences[i + 2].trim();
-    const words = sentence.split(' ');
-    const keyWord = words.find(w => w.length > 6) || topic;
-
-    questions.push({
-      id: i + 3,
-      question: `What does the content say about ${keyWord.toLowerCase()}?`,
-      type: 'multiple-choice',
-      difficulty: i === 0 ? 'easy' : 'medium',
-      options: [
-        sentence.substring(0, 50),
-        'This is not mentioned',
-        'The opposite is true',
-        'It is undefined',
-      ],
-      correctAnswer: sentence.substring(0, 50),
-      explanation: 'This information is stated in the article.',
-      category: 'fact',
-    });
-  }
-
-  // Remaining questions
-  while (questions.length < count && sentences.length > questions.length) {
-    const sentence = sentences[questions.length].trim();
-    
-    questions.push({
-      id: questions.length + 1,
-      question: `Explain: ${sentence.substring(0, 60)}...`,
-      type: 'short-answer',
-      difficulty: questions.length > 7 ? 'hard' : 'medium',
-      correctAnswer: sentence,
-      explanation: 'Refer to the article for the complete explanation.',
-      category: 'concept',
-    });
-  }
-
-  console.log(`✅ Generated ${questions.length} fallback questions`);
-
-  return {
-    topic,
-    level,
-    totalQuestions: questions.length,
-    questions,
-  };
+  // Delegate to topic-first generation (ignores articleText for better variety)
+  return generateTopicQuiz(topic, count, level, [], 1);
 }

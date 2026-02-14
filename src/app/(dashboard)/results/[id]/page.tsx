@@ -4,21 +4,7 @@ import { prisma } from '@/lib/db/prisma';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Download, Share2, BookOpen, FileText, Presentation, Layers, Brain, BarChart3, Network, Volume2 } from 'lucide-react';
 import Link from 'next/link';
-import { AudioPlayerSection } from '@/components/features/AudioPlayerSection';
 import { formatForDisplay } from '@/lib/utils/text-formatter';
-import { FlashcardViewer } from '@/components/features/FlashcardViewer';
-import { GenerateFlashcardsButton } from '@/components/features/GenerateFlashcardsButton';
-import { PresentationViewer } from '@/components/features/PresentationViewer';
-import { GeneratePresentationButton } from '@/components/features/GeneratePresentationButton';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { DiagramViewer } from '@/components/features/DiagramViewer';
-import { PracticeQuizViewer } from '@/components/features/PracticeQuizViewer';
-import { GenerateDiagramsButton } from '@/components/features/GenerateDiagramsButton';
-import { extractKeyPoints, generateConceptMapData } from '@/lib/utils/concept-map-utils';
-import { generatePracticeQuestions } from '@/lib/services/practice-questions-generator';
-import { Prisma } from '@prisma/client';
-import { GenerateAudioButton } from '@/components/features/GenerateAudioButton';
-import { InteractiveConceptMapClickable } from '@/components/features/InteractiveConceptMap';
 import { InteractiveResultsView } from '@/components/features/InteractiveResultsView';
 import { CommentSection } from '@/components/social/CommentSection';
 import { SaveButton } from '@/components/features/SaveButton';
@@ -188,7 +174,7 @@ export default async function ResultsPage({
           
           {/* Remove Export/Share buttons - commented out for future use */}
           
-        <div className="flex gap-2 mt-3 flex-wrap">
+          <div className="flex gap-2 mt-3 flex-wrap">
             <ShareButton queryId={query.id} title={query.queryText} />
             <WhatsAppShareButton
               topic={query.queryText}

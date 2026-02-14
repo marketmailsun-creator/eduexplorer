@@ -372,7 +372,12 @@ export default function ShareButton({ queryId, contentId, title }: ShareButtonPr
                   <Button
                     onClick={handleShareToGroups}
                     disabled={selectedGroups.length === 0 || sharingToGroups}
-                    className="w-full"
+                    className={`
+                        inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold
+                        border-2 transition-all duration-200 select-none focus:outline-none
+                        active:scale-95 disabled:opacity-60
+                        
+                      `}
                   >
                     {sharingToGroups
                       ? 'Sharing...'

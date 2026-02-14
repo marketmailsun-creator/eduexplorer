@@ -9,6 +9,7 @@ import { useSearchParams } from 'next/navigation';
 import { OnboardingFlow } from '@/components/features/OnboardingFlow';
 import { ContinueLearning } from '@/components/features/ContinueLearning';
 import { DailyGoalWidget } from '@/components/features/DailyGoalWidget';
+import { HistoryPanel } from '@/components/features/HistoryPanel';
 import { 
   Loader2, 
   Camera, 
@@ -638,68 +639,7 @@ interface SplitLayoutExploreProps {
       )}
 
       {/* History Sidebar - Mobile Full Screen */}
-      {showHistory && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex justify-end z-50">
-          <div className="w-full sm:max-w-md bg-white h-full shadow-2xl overflow-y-auto">
-            <div className="sticky top-0 bg-white border-b border-gray-200 p-3 sm:p-4 flex items-center justify-between z-10">
-              <h3 className="text-lg sm:text-xl font-bold text-gray-900">History</h3>
-              <Button variant="ghost" size="sm" onClick={() => setShowHistory(false)} className="h-9 w-9 p-0">
-                <X className="h-5 w-5" />
-              </Button>
-            </div>
-            <div className="p-3 sm:p-4">
-              {historyLoading ? (
-                <div className="flex items-center justify-center py-12">
-                  <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-                </div>
-              ) : historyItems.length === 0 ? (
-                <div className="text-center py-12">
-                  <FileText className="h-12 w-12 text-gray-400 mx-auto mb-3" />
-                  <p className="text-gray-600 text-sm sm:text-base">No history yet</p>
-                  <p className="text-xs sm:text-sm text-gray-400 mt-1">Your queries will appear here</p>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {historyItems.map((item) => (
-                    <div
-                      key={item.id}
-                      className="relative group"
-                    >
-                      <button
-                        onClick={() => handleHistoryItemClick(item.id)}
-                        disabled={deletingIds.has(item.id)}
-                        className="w-full text-left p-2.5 sm:p-3 pr-10 sm:pr-12 rounded-lg hover:bg-gray-50 border border-gray-200 hover:border-blue-300 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        <div className="text-sm sm:text-base font-medium text-gray-900 line-clamp-2 group-hover:text-blue-600">
-                          {item.topicDetected || item.queryText}
-                        </div>
-                        <div className="text-xs text-gray-500 mt-1 flex items-center gap-1.5 sm:gap-2">
-                          <Clock className="h-3 w-3" />
-                          {formatTimeAgo(item.createdAt)}
-                        </div>
-                      </button>
-                      
-                      {/* Delete Button */}
-                      <button
-                        onClick={(e) => handleDeleteHistoryItem(item.id, e)}
-                        disabled={deletingIds.has(item.id)}
-                        className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 p-2 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-600 transition-colors opacity-0 group-hover:opacity-100 disabled:opacity-50"
-                        title="Delete from history"
-                      >
-                        {deletingIds.has(item.id) ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Trash2 className="h-4 w-4" />
-                        )}
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      {showHistory && <HistoryPanel onClose={() => setShowHistory(false)} />}
     </div>
   );
 }

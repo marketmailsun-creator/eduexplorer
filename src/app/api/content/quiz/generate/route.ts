@@ -1,7 +1,17 @@
+// ============================================================
+// FILE: src/app/api/content/quiz/generate/route.ts  — REPLACE EXISTING
+// Changes:
+//   • Accepts `regenerate: true` to force a new quiz set
+//   • Passes `previousQuestions` to AI so it doesn't repeat them
+//   • Creates multiple quiz records (quizSet 1, 2, 3…) instead of
+//     blocking if one already exists
+//   • Returns all quiz sets so the client can pick the latest
+// ============================================================
+
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db/prisma';
-import { generatePracticeQuestions } from '@/lib/services/practice-questions-generator';
+import { generateTopicQuiz } from '@/lib/services/practice-questions-generator';
 import { canGenerateContent } from '@/lib/services/plan-limits.service';
 import { z } from 'zod';
 import { Prisma } from '@prisma/client';
@@ -9,6 +19,7 @@ import { Prisma } from '@prisma/client';
 const quizSchema = z.object({
   queryId: z.string(),
   numQuestions: z.number().optional().default(10),
+  regenerate: z.boolean().optional().default(false),
 });
 
 export async function POST(req: NextRequest) {
@@ -19,120 +30,90 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { queryId, numQuestions } = quizSchema.parse(body);
+    const { queryId, numQuestions, regenerate } = quizSchema.parse(body);
 
-    console.log('🎯 Quiz API called for query:', queryId);
-
-    // Get the query and article content
+    // Get the query
     const query = await prisma.query.findUnique({
       where: { id: queryId },
-      include: {
-        content: {
-          where: { contentType: 'article' },
-        },
-      },
+      select: { id: true, userId: true, queryText: true, complexityLevel: true },
     });
 
-    if (!query) {
-      return NextResponse.json({ error: 'Query not found' }, { status: 404 });
+    if (!query || query.userId !== session.user.id) {
+      return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
 
-    if (query.userId !== session.user.id) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
-
-    // Check if quiz already exists
-    const existingQuiz = await prisma.content.findFirst({
-      where: {
-        queryId,
-        contentType: 'quiz',
-      },
+    // Fetch all existing quiz sets for this query
+    const existingQuizzes = await prisma.content.findMany({
+      where: { queryId, contentType: 'quiz' },
+      orderBy: { generatedAt: 'asc' },
     });
 
-    if (existingQuiz) {
-      console.log('✅ Quiz already exists');
+    // If not regenerating and a quiz already exists, return the latest
+    if (!regenerate && existingQuizzes.length > 0) {
+      const latest = existingQuizzes[existingQuizzes.length - 1];
       return NextResponse.json({
         success: true,
-        quizId: existingQuiz.id,
+        quizId: latest.id,
+        setNumber: existingQuizzes.length,
+        totalSets: existingQuizzes.length,
         cached: true,
       });
     }
 
-    // Check plan limits
-    const canGenerate = await canGenerateContent(
-      session.user.id,
-      queryId,
-      'quiz'
-    );
-
+    // Check plan limits for regeneration
+    const canGenerate = await canGenerateContent(session.user.id, queryId, 'quiz');
     if (!canGenerate.allowed) {
       return NextResponse.json(
-        {
-          error: canGenerate.reason,
-          current: canGenerate.current,
-          limit: canGenerate.limit,
-        },
+        { error: canGenerate.reason, current: canGenerate.current, limit: canGenerate.limit },
         { status: 403 }
       );
     }
 
-    // Get article content
-    const articleContent = query.content[0];
-    if (!articleContent) {
-      return NextResponse.json({ error: 'Article not found' }, { status: 404 });
-    }
+    // Collect all previous question texts to avoid repeats
+    const previousQuestions: string[] = existingQuizzes.flatMap(q => {
+      const data = q.data as any;
+      return (data?.quiz?.questions ?? []).map((question: any) => question.question as string);
+    });
 
-    const articleText = (articleContent.data as any)?.text || '';
-    if (!articleText) {
-      return NextResponse.json({ error: 'No article text available' }, { status: 400 });
-    }
+    const setNumber = existingQuizzes.length + 1;
 
-    console.log('✅ Found article:', articleText.length, 'characters');
-
-    // Generate quiz
-    console.log(`🎯 Generating ${numQuestions} questions...`);
-    const quiz = await generatePracticeQuestions(
+    // Generate new topic-first quiz (NOT from article text)
+    const quiz = await generateTopicQuiz(
       query.queryText,
-      articleText,
       numQuestions,
-      query.complexityLevel || 'college'
+      query.complexityLevel || 'college',
+      previousQuestions,
+      setNumber
     );
 
-    console.log(`✅ Quiz generated: ${quiz.questions.length} questions`);
-
-    // Save to database
+    // Save as a new quiz set
     const quizContent = await prisma.content.create({
       data: {
         queryId,
         contentType: 'quiz',
-        title: `${query.queryText} - Practice Quiz`,
+        title: `${query.queryText} - Quiz Set ${setNumber}`,
         data: {
           status: 'completed',
+          setNumber,
           quiz: quiz as unknown as Prisma.InputJsonValue,
         } as Prisma.InputJsonValue,
       },
     });
 
-    console.log('💾 Quiz saved to database');
-
     return NextResponse.json({
       success: true,
       quizId: quizContent.id,
+      setNumber,
+      totalSets: setNumber,
       questionCount: quiz.questions.length,
       cached: false,
     });
+
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        { error: 'Invalid input', details: error.issues },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Invalid input' }, { status: 400 });
     }
-
     console.error('❌ Quiz generation error:', error);
-    return NextResponse.json(
-      { error: 'Failed to generate quiz' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Failed to generate quiz' }, { status: 500 });
   }
 }
