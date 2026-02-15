@@ -400,10 +400,7 @@ interface SplitLayoutExploreProps {
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-purple-50 pb-16 md:pb-8">
       <div className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-6 md:py-8">
         {/* ✅ Continue Learning strip */}
-        <div className="flex justify-end mb-4 sm:mb-5">
-          <DailyGoalWidget compact />
-        </div>
-        <ContinueLearning />
+      
         {/* Hero Section - Mobile Optimized */}
         <div className="text-center mb-6 sm:mb-8 space-y-2 sm:space-y-4">
           <div className="inline-flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-blue-100 text-blue-700 rounded-full text-xs sm:text-sm font-medium mb-2 sm:mb-4 animate-pulse">
@@ -420,7 +417,10 @@ interface SplitLayoutExploreProps {
             Ask any question and get comprehensive learning materials
           </p>
         </div>
-
+        <div className="flex justify-end mb-4 sm:mb-5">
+          <DailyGoalWidget compact />
+        </div>
+        <ContinueLearning />
         {/* Main Layout - Stack on Mobile, Side-by-Side on Desktop */}
         <div className="flex flex-col lg:grid lg:grid-cols-12 gap-4 sm:gap-6">
           
