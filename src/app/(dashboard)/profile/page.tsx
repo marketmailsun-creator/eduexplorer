@@ -18,6 +18,8 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { NotificationPreferences } from '@/components/features/NotificationPreferences';
+import { DeleteAccountSection } from '@/components/features/DeleteAccountSection';
+import { ChangePasswordSection } from '@/components/features/ChangePasswordSection';
 
 // ── Avatar upload component ───────────────────────────────────
 function AvatarUpload({
@@ -325,6 +327,8 @@ export default function ProfilePage() {
 
         {/* ── Notification Preferences ─────────────────────────── */}
         <NotificationPreferences />
+        <DeleteAccountSection hasPassword={user?.hasPassword ?? false} />
+        <ChangePasswordSection hasPassword={user?.hasPassword ?? false} />
 
         {/* ── Quick links ──────────────────────────────────────── */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">

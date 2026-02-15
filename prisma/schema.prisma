@@ -51,6 +51,17 @@ model VerificationToken {
   @@map("verification_tokens")
 }
 
+model PasswordResetToken {
+  id      String   @id @default(cuid())
+  email   String   @unique
+  token   String   @unique
+  expires DateTime
+  createdAt DateTime @default(now())
+
+  @@index([token])
+  @@map("password_reset_tokens")
+}
+
 // ============================================
 // User Model (Updated for OAuth)
 // ============================================
@@ -92,6 +103,9 @@ model User {
   razorpaySubscriptionId String?  @unique 
 
   onboardingDone Boolean @default(false)
+
+  emailVerificationToken  String?   // secure hex token sent via email
+  emailVerificationExpires DateTime? // token expires after 24h
   
   pushSubscriptions PushSubscription[]
   subscription Subscription[]

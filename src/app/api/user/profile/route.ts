@@ -1,6 +1,7 @@
 // ============================================================
-// FILE: src/app/api/user/profile/route.ts
-// Returns enriched user profile data for the profile page.
+// FILE: src/app/api/user/profile/route.ts  — REPLACE EXISTING
+// Added: hasPassword field so the frontend knows whether to show
+// the password field in the delete account confirmation dialog.
 // ============================================================
 
 import { NextResponse } from 'next/server';
@@ -25,6 +26,8 @@ export async function GET() {
         image: true,
         plan: true,
         createdAt: true,
+        emailVerified: true,
+        password: true, // used only to derive hasPassword — never sent raw
         _count: {
           select: {
             queries: true,
@@ -38,7 +41,13 @@ export async function GET() {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    return NextResponse.json(user);
+    // Don't send the hashed password to the client — just a boolean
+    const { password, ...userWithoutPassword } = user;
+
+    return NextResponse.json({
+      ...userWithoutPassword,
+      hasPassword: !!password,
+    });
   } catch (error) {
     console.error('Profile fetch error:', error);
     return NextResponse.json({ error: 'Failed to fetch profile' }, { status: 500 });
