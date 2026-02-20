@@ -5,6 +5,7 @@ import { SessionProvider } from "@/components/providers/SessionProvider";
 import { MobileNav } from "@/components/navigation/MobileNav";
 import { RegisterServiceWorker } from './register-sw';
 import { Toaster } from "@/components/ui/toaster";
+import { Footer } from '@/components/layout/Footer';
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -52,6 +53,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         </SessionProvider>
          <Toaster />
        <RegisterServiceWorker />
+       <Footer /> 
        <MobileNav /> 
 
        <script
