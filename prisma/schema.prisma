@@ -68,7 +68,7 @@ model PasswordResetToken {
 
 model User {
   id            String    @id @default(cuid())
-  email         String    @unique
+  email         String?    @unique
   name          String?
   password      String?   // Optional now (OAuth users don't have passwords)
   image         String?
@@ -95,6 +95,10 @@ model User {
   quizScores         QuizScore[]
   followers          UserFollow[]      @relation("UserFollower")
   following          UserFollow[]      @relation("UserFollowing")
+
+  phone           String?   @unique   
+  phoneVerified   DateTime?           
+  whatsappOptIn   Boolean   @default(true) 
 
   // Razorpay fields
   razorpayCustomerId    String?
@@ -432,4 +436,18 @@ model QuizReviewReminder {
   @@index([sendAt])
   @@index([userId])
   @@map("quiz_review_reminders")
+}
+
+model OtpVerification {
+  id          String   @id @default(cuid())
+  phone       String               // E.164 format: +919876543210
+  otp         String               // 6-digit code (hashed)
+  reqId       String?              // MSG91 request ID for verify API
+  purpose     String               // "login" | "signup"
+  attempts    Int      @default(0) // block after 5 wrong attempts
+  expiresAt   DateTime             // 10 minutes from creation
+  createdAt   DateTime @default(now())
+
+  @@index([phone])
+  @@map("otp_verifications")
 }

@@ -41,9 +41,17 @@
     }
   ],
   "crons": [
-  {
-    "path": "/api/cron/send-reminders",
-    "schedule": "0 12 * * *"
-  }
-]
+    {
+      "path": "/api/cron/send-reminders",
+      "schedule": "0 12 * * *"
+    },
+    {
+        "path": "/api/cron/whatsapp-notifications?type=weekly",
+        "schedule": "0 9 * * 1"
+    },
+    {
+      "path": "/api/cron/whatsapp-notifications?type=quiz",
+      "schedule": "0 10 * * *"
+    }
+  ]
 }

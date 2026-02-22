@@ -1,276 +1,336 @@
 'use client';
-// ============================================================
-// FILE: src/app/(auth)/login/page.tsx  — REPLACE EXISTING
-// Changes:
-//   - Shows "Email verified!" success banner when ?verified=true
-//   - Shows error banner for invalid/expired token
-//   - Blocks login for unverified email users and offers resend
-// ============================================================
+// src/app/(auth)/login/page.tsx — REPLACE EXISTING
 
-import { useState, Suspense } from 'react';
-import { signIn } from 'next-auth/react';
+import { useState, Suspense, useEffect } from 'react';
+import { useSession } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, BookOpen, Check, CheckCircle2, AlertCircle, Mail } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Loader2, BookOpen, Smartphone, MessageCircle, ArrowLeft, Check } from 'lucide-react';
 import Link from 'next/link';
+
+type Step = 'phone' | 'otp';
 
 function LoginContent() {
   const router = useRouter();
+  const { data: session, status, update } = useSession();
   const searchParams = useSearchParams();
-  const verified = searchParams.get('verified') === 'true';
-  const tokenError = searchParams.get('error');
 
-  const [loading, setLoading] = useState(false);
-  const [googleLoading, setGoogleLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [unverifiedEmail, setUnverifiedEmail] = useState('');
-  const [resending, setResending] = useState(false);
-  const [resentSuccess, setResentSuccess] = useState(false);
+  const [step, setStep]             = useState<Step>('phone');
+  const [phone, setPhone]           = useState('');
+  const [otp, setOtp]               = useState('');
+  const [channel, setChannel]       = useState<'whatsapp' | 'sms'>('whatsapp');
+  const [loading, setLoading]       = useState(false);
+  const [error, setError]           = useState('');
+  const [resendTimer, setResendTimer] = useState(0);
 
-  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+  // Redirect if already logged in
+  useEffect(() => {
+    if (status === 'authenticated' && session?.user) {
+      router.replace('/explore');
+    }
+  }, [status, session, router]);
+
+  // Countdown timer for resend
+  useEffect(() => {
+    if (resendTimer <= 0) return;
+    const t = setTimeout(() => setResendTimer(r => r - 1), 1000);
+    return () => clearTimeout(t);
+  }, [resendTimer]);
+
+  // ── Step 1: Send OTP ────────────────────────────────────────
+  async function handleSendOtp(e: React.FormEvent) {
     e.preventDefault();
-    setLoading(true);
     setError('');
-    setUnverifiedEmail('');
+    setLoading(true);
 
-    const formData = new FormData(e.currentTarget);
-    const email = formData.get('email') as string;
-    const password = formData.get('password') as string;
+    // Prepend +91 if user enters 10-digit Indian number
+    const normalizedPhone = phone.startsWith('+')
+      ? phone
+      : phone.length === 10 ? `+91${phone}` : `+${phone}`;
 
-    // Check if email is verified before attempting sign in
     try {
-      const checkRes = await fetch('/api/auth/check-verified', {
+      const res = await fetch('/api/phone/send-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ phone: normalizedPhone, purpose: 'login' }),
       });
-      const checkData = await checkRes.json();
+      const data = await res.json();
 
-      if (checkData.needsVerification) {
-        setUnverifiedEmail(email);
-        setLoading(false);
+      if (!res.ok) {
+        // 404 = not registered → nudge to signup
+        if (res.status === 404) {
+          setError("No account found. Don't have one?");
+        } else {
+          setError(data.error || 'Failed to send OTP');
+        }
         return;
       }
+
+      setChannel(data.channel);
+      setPhone(normalizedPhone);
+      setStep('otp');
+      setResendTimer(30);
     } catch {
-      // If check fails, proceed normally
-    }
-
-    const result = await signIn('credentials', {
-      email,
-      password,
-      redirect: false,
-    });
-
-    if (result?.error) {
-      setError('Invalid email or password');
+      setError('Network error. Please try again.');
+    } finally {
       setLoading(false);
-    } else {
-      router.push('/explore');
-      router.refresh();
     }
   }
 
-  async function handleGoogleSignIn() {
-    setGoogleLoading(true);
+  // ── Step 2: Verify OTP ──────────────────────────────────────
+  async function handleVerifyOtp(e: React.FormEvent) {
+    e.preventDefault();
     setError('');
-    try {
-      await signIn('google', { callbackUrl: '/explore', redirect: true });
-    } catch {
-      setError('Failed to sign in with Google');
-      setGoogleLoading(false);
-    }
-  }
+    setLoading(true);
 
-  async function handleResendVerification() {
-    if (!unverifiedEmail) return;
-    setResending(true);
     try {
-      await fetch('/api/auth/resend-verification', {
+      const res = await fetch('/api/phone/verify-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: unverifiedEmail }),
+        body: JSON.stringify({ phone, otp, purpose: 'login' }),
       });
-      setResentSuccess(true);
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error || 'Verification failed');
+        return;
+      }
+
+      // Session cookie is set by the API — refresh session then navigate
+      await update();
+      router.replace('/explore');
     } catch {
-      setError('Failed to resend. Please try again.');
+      setError('Network error. Please try again.');
     } finally {
-      setResending(false);
+      setLoading(false);
     }
   }
 
-  const tokenErrorMessage =
-    tokenError === 'invalid_token' ? 'Verification link is invalid or has expired. Please request a new one.' :
-    tokenError === 'missing_token' ? 'Missing verification token. Please use the link from your email.' :
-    tokenError === 'verification_failed' ? 'Verification failed. Please try again.' :
-    null;
+  // ── Resend OTP ──────────────────────────────────────────────
+  async function handleResend() {
+    if (resendTimer > 0) return;
+    setError('');
+    setLoading(true);
+    try {
+      const res = await fetch('/api/phone/send-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone, purpose: 'login' }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setResendTimer(30);
+        setOtp('');
+      } else {
+        setError(data.error || 'Failed to resend');
+      }
+    } catch {
+      setError('Network error');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  if (status === 'loading') {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-indigo-500" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen grid lg:grid-cols-2">
-      {/* Left side — Brand */}
-      <div className="hidden lg:flex flex-col justify-center bg-gradient-to-br from-blue-600 via-purple-600 to-pink-600 p-12 text-white">
+      {/* Left — Brand panel */}
+      <div className="hidden lg:flex flex-col justify-center bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600 p-12 text-white">
         <div className="mb-8">
           <div className="p-3 bg-white/20 rounded-xl w-fit mb-6">
             <BookOpen className="h-10 w-10 text-white" />
           </div>
           <h1 className="text-4xl font-extrabold mb-3">EduExplorer</h1>
-          <p className="text-blue-100 text-lg leading-relaxed">
+          <p className="text-indigo-100 text-lg leading-relaxed">
             AI-powered learning. Any topic. Instant lessons, quizzes, flashcards and more.
           </p>
         </div>
         <div className="space-y-3">
-          {['AI-generated articles & audio', 'Interactive quizzes & flashcards', 'Track your learning streak', 'Study groups & leaderboards'].map((f) => (
+          {[
+            'AI-generated articles & audio',
+            'Interactive quizzes & flashcards',
+            'Track your learning streak',
+            'Study groups & leaderboards',
+          ].map(f => (
             <div key={f} className="flex items-center gap-3">
               <div className="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
                 <Check className="h-3 w-3" />
               </div>
-              <span className="text-blue-100 text-sm">{f}</span>
+              <span className="text-indigo-100 text-sm">{f}</span>
             </div>
           ))}
         </div>
-        <div className="grid grid-cols-3 gap-4 pt-8 mt-8 border-t border-white/20">
-          {[['1M+', 'Topics'], ['50K+', 'Learners'], ['4.9★', 'Rating']].map(([val, label]) => (
-            <div key={label}>
-              <div className="text-3xl font-bold">{val}</div>
-              <div className="text-blue-100 text-sm">{label}</div>
-            </div>
-          ))}
+        {/* WhatsApp badge */}
+        <div className="mt-10 flex items-center gap-3 bg-white/10 rounded-xl p-4">
+          <div className="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
+            <MessageCircle className="h-5 w-5 text-white" />
+          </div>
+          <div>
+            <p className="font-semibold text-sm">Login via WhatsApp OTP</p>
+            <p className="text-indigo-200 text-xs">No passwords. No Google. Just your phone.</p>
+          </div>
         </div>
       </div>
 
-      {/* Right side — Form */}
+      {/* Right — Form */}
       <div className="flex items-center justify-center p-6 bg-gray-50">
-        <Card className="w-full max-w-md shadow-xl">
-          <CardHeader className="space-y-1 text-center">
-            <div className="lg:hidden flex justify-center mb-4">
-              <div className="p-3 bg-gradient-to-br from-blue-600 to-purple-600 rounded-xl">
-                <BookOpen className="h-8 w-8 text-white" />
-              </div>
+        <div className="w-full max-w-md">
+          {/* Mobile logo */}
+          <div className="lg:hidden text-center mb-8">
+            <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 shadow-lg mb-3">
+              <BookOpen className="h-7 w-7 text-white" />
             </div>
-            <CardTitle className="text-2xl font-bold">Welcome Back</CardTitle>
-            <CardDescription>Sign in to continue your learning journey</CardDescription>
-          </CardHeader>
+            <h1 className="text-2xl font-extrabold text-gray-900">EduExplorer</h1>
+          </div>
 
-          <CardContent className="space-y-4">
+          <Card className="shadow-xl border-0 rounded-2xl overflow-hidden">
+            <CardHeader className="text-center pb-2">
+              <CardTitle className="text-2xl font-bold">
+                {step === 'phone' ? 'Welcome Back' : 'Enter OTP'}
+              </CardTitle>
+              <CardDescription>
+                {step === 'phone'
+                  ? 'Enter your mobile number to receive an OTP'
+                  : `OTP sent via ${channel === 'whatsapp' ? 'WhatsApp' : 'SMS'} to ${phone}`}
+              </CardDescription>
+            </CardHeader>
 
-            {/* ── Success: Email verified ── */}
-            {verified && (
-              <div className="flex items-start gap-3 bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-xl text-sm">
-                <CheckCircle2 className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
-                <div>
-                  <p className="font-semibold">Email verified!</p>
-                  <p className="text-green-700 mt-0.5">You can now sign in to your account.</p>
-                </div>
-              </div>
-            )}
+            <CardContent className="p-6 space-y-4">
 
-            {/* ── Error: Token invalid/expired ── */}
-            {tokenErrorMessage && (
-              <div className="flex items-start gap-3 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">
-                <AlertCircle className="h-5 w-5 flex-shrink-0 mt-0.5" />
-                <p>{tokenErrorMessage}</p>
-              </div>
-            )}
-
-            {/* ── Unverified email warning ── */}
-            {unverifiedEmail && (
-              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
-                <div className="flex items-start gap-3 mb-3">
-                  <Mail className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+              {/* ── Step 1: Phone input ── */}
+              {step === 'phone' && (
+                <form onSubmit={handleSendOtp} className="space-y-4">
                   <div>
-                    <p className="text-amber-800 font-semibold text-sm">Email not verified</p>
-                    <p className="text-amber-700 text-xs mt-1">
-                      Please verify your email before signing in. Check your inbox for the verification link.
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Mobile Number
+                    </label>
+                    <div className="flex">
+                      <span className="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-gray-300 bg-gray-50 text-gray-500 text-sm font-medium">
+                        +91
+                      </span>
+                      <Input
+                        type="tel"
+                        placeholder="9876543210"
+                        value={phone.replace(/^\+91/, '')}
+                        onChange={e => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                        className="h-11 rounded-l-none"
+                        required
+                        maxLength={10}
+                        pattern="[0-9]{10}"
+                        disabled={loading}
+                      />
+                    </div>
+                    <p className="text-xs text-gray-400 mt-1">
+                      You'll receive an OTP on WhatsApp
                     </p>
                   </div>
-                </div>
-                {resentSuccess ? (
-                  <div className="flex items-center gap-2 text-green-700 text-xs font-medium">
-                    <CheckCircle2 className="h-4 w-4" />
-                    New verification email sent!
-                  </div>
-                ) : (
-                  <button
-                    onClick={handleResendVerification}
-                    disabled={resending}
-                    className="text-xs text-amber-700 font-semibold underline underline-offset-2 hover:text-amber-900 disabled:opacity-50"
-                  >
-                    {resending ? 'Sending...' : 'Resend verification email'}
+
+                  {error && (
+                    <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                      {error}
+                      {error.includes("Don't have one") && (
+                        <Link href="/signup" className="ml-1 text-indigo-600 font-semibold underline">
+                          Sign up
+                        </Link>
+                      )}
+                    </div>
+                  )}
+
+                  <Button type="submit" disabled={loading || phone.replace(/\D/g,'').length < 10}
+                    className="w-full h-11 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 font-semibold">
+                    {loading
+                      ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Sending OTP...</>
+                      : <><MessageCircle className="mr-2 h-4 w-4" />Send OTP via WhatsApp</>}
+                  </Button>
+                </form>
+              )}
+
+              {/* ── Step 2: OTP input ── */}
+              {step === 'otp' && (
+                <form onSubmit={handleVerifyOtp} className="space-y-4">
+                  <button type="button" onClick={() => { setStep('phone'); setOtp(''); setError(''); }}
+                    className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 mb-2">
+                    <ArrowLeft className="h-4 w-4" /> Change number
                   </button>
-                )}
-              </div>
-            )}
 
-            {/* Google Sign In */}
-            <Button
-              type="button"
-              variant="outline"
-              className="w-full h-11 border-gray-300"
-              onClick={handleGoogleSignIn}
-              disabled={googleLoading || loading}
-            >
-              {googleLoading ? (
-                <><Loader2 className="mr-2 h-5 w-5 animate-spin" />Connecting to Google...</>
-              ) : (
-                <>
-                  <svg className="mr-2 h-5 w-5" viewBox="0 0 24 24">
-                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-                  </svg>
-                  Continue with Google
-                </>
+                  {/* Channel badge */}
+                  <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium
+                    ${channel === 'whatsapp' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-blue-50 text-blue-700 border border-blue-200'}`}>
+                    <MessageCircle className="h-4 w-4" />
+                    OTP sent via {channel === 'whatsapp' ? 'WhatsApp' : 'SMS'}
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      6-digit OTP
+                    </label>
+                    <Input
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="• • • • • •"
+                      value={otp}
+                      onChange={e => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                      className="h-12 text-center text-2xl tracking-[0.5em] font-bold"
+                      maxLength={6}
+                      required
+                      disabled={loading}
+                      autoFocus
+                    />
+                  </div>
+
+                  {error && (
+                    <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                      {error}
+                    </div>
+                  )}
+
+                  <Button type="submit" disabled={loading || otp.length < 6}
+                    className="w-full h-11 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 font-semibold">
+                    {loading
+                      ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Verifying...</>
+                      : 'Verify & Login'}
+                  </Button>
+
+                  <div className="text-center text-sm text-gray-500">
+                    Didn't receive OTP?{' '}
+                    {resendTimer > 0 ? (
+                      <span className="text-gray-400">Resend in {resendTimer}s</span>
+                    ) : (
+                      <button type="button" onClick={handleResend} disabled={loading}
+                        className="text-indigo-600 font-semibold hover:text-indigo-800 disabled:opacity-50">
+                        Resend OTP
+                      </button>
+                    )}
+                  </div>
+                </form>
               )}
-            </Button>
 
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-300" />
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-white px-2 text-gray-500">or continue with email</span>
-              </div>
-            </div>
-
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium mb-2">Email</label>
-                <Input name="email" type="email" placeholder="you@example.com" required disabled={loading || googleLoading} className="h-11" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-2">Password</label>
-                <Input name="password" type="password" placeholder="••••••••" required disabled={loading || googleLoading} className="h-11" />
-              </div>
-              <div className="flex justify-end">
-                <Link href="/forgot-password" className="text-xs text-indigo-600 hover:text-indigo-800 font-medium">
-                  Forgot password?
-                </Link>
-              </div>
-              {error && (
-                <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-md text-sm">
-                  {error}
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-200" /></div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-white px-2 text-gray-400">or</span>
                 </div>
-              )}
+              </div>
 
-              <Button
-                type="submit"
-                disabled={loading || googleLoading}
-                className="w-full h-11 text-base bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
-              >
-                {loading ? <><Loader2 className="mr-2 h-5 w-5 animate-spin" />Signing in...</> : 'Sign In'}
-              </Button>
-            </form>
+              <p className="text-center text-sm text-gray-500">
+                Don't have an account?{' '}
+                <Link href="/signup" className="text-indigo-600 font-semibold hover:text-indigo-800">
+                  Sign up free
+                </Link>
+              </p>
 
-            <div className="text-center text-sm">
-              <span className="text-gray-600">Don't have an account? </span>
-              <Link href="/signup" className="text-blue-600 hover:text-blue-700 font-semibold hover:underline">
-                Sign up for free
-              </Link>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   );
@@ -278,7 +338,7 @@ function LoginContent() {
 
 export default function LoginPage() {
   return (
-    <Suspense>
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-indigo-400" /></div>}>
       <LoginContent />
     </Suspense>
   );
