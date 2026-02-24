@@ -106,7 +106,10 @@ model User {
 
   emailVerificationToken  String?   // secure hex token sent via email
   emailVerificationExpires DateTime? // token expires after 24h
-  
+
+  phone         String?   @unique   // E.164 format: +91XXXXXXXXXX
+  phoneVerified DateTime?            // set when OTP is successfully verified
+
   pushSubscriptions PushSubscription[]
   subscription Subscription[]
   savedQueries      SavedQuery[]

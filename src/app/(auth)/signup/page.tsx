@@ -11,7 +11,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, Check, X, Zap, Crown, BookOpen } from 'lucide-react';
+import { Loader2, Check, X, Zap, Crown, BookOpen, Smartphone } from 'lucide-react';
 import Link from 'next/link';
 import { signIn } from 'next-auth/react';
 
@@ -156,6 +156,14 @@ export default function SignupPage() {
                   Continue with Google
                 </>
               )}
+            </Button>
+
+            {/* Mobile OTP Signup */}
+            <Button type="button" variant="outline" className="w-full h-11 border-gray-300" asChild>
+              <Link href="/phone-signup">
+                <Smartphone className="mr-2 h-5 w-5 text-green-600" />
+                Sign up with Mobile (OTP)
+              </Link>
             </Button>
 
             <div className="relative">

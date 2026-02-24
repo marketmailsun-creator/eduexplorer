@@ -47,7 +47,7 @@ export function Footer() {
             <h3 className="text-white font-semibold mb-3">Contact</h3>
             <ul className="space-y-2 text-sm text-gray-400">
               <li>Email: admin@eduexplorer.ai</li>
-              <li>Support: support@eduexplorer.ai</li>
+              <li>Support: admin@eduexplorer.ai</li>
             </ul>
           </div>
         </div>
@@ -57,7 +57,7 @@ export function Footer() {
           {/* Meta/WhatsApp Business Compliance Section */}
           <div className="text-xs text-gray-500 space-y-1 mb-4">
             <p><strong className="text-gray-400">EduExplorer</strong></p>
-            <p>Operated by: [Your Full Name or Company Name]</p>
+            <p>Operated by: Usha Sree</p>
             <p>Location: India</p>
             <p>Email: admin@eduexplorer.ai</p>
           </div>
