@@ -43,11 +43,15 @@ export default function UpgradePage() {
         body: JSON.stringify({ plan }),
       });
 
-      const { orderId, amount, currency } = await response.json();
+      const { orderId, amount, currency, key } = await response.json();
+
+      if (!key) {
+        throw new Error('Payment configuration error. Please contact support.');
+      }
 
       // Razorpay options
       const options = {
-        key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
+        key,
         amount: amount,
         currency: currency,
         name: 'EduExplorer',
@@ -95,14 +99,25 @@ export default function UpgradePage() {
     }
   };
 
-  const features = [
-    'Unlimited queries',
-    'Priority AI processing',
-    'Advanced analytics',
-    'Export to PDF/PPTX',
+  const freeFeatures = [
+    '5 AI lessons per day',
+    'Basic quizzes (1 per topic)',
+    'Limited flashcards (1 per topic)',
+    'XP & streak tracking',
     'Study groups',
+    'Global leaderboard',
+  ];
+
+  const features = [
+    'Unlimited AI lessons daily',
+    'Unlimited quizzes & flashcards',
+    'Audio narration (on-demand)',
+    'Presentation generation',
     'Ad-free experience',
+    'Download content (PDF/PPTX)',
+    'Priority AI processing',
     'Priority support',
+    'All XP & gamification features',
   ];
 
   return (
@@ -116,25 +131,54 @@ export default function UpgradePage() {
         </p>
       </div>
 
-      <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
-        {/* Monthly Plan */}
+      <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
+        {/* Free Plan */}
         <Card className="relative">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-2xl">
-              <Zap className="h-6 w-6 text-blue-600" />
-              Monthly
+            <CardTitle className="flex items-center gap-2 text-xl text-gray-700">
+              Free
             </CardTitle>
-            <div className="mt-4">
-              <span className="text-4xl font-bold">₹999</span>
+            <div className="mt-3">
+              <span className="text-3xl font-bold">₹0</span>
               <span className="text-gray-600">/month</span>
-              <div className="text-sm text-gray-500 mt-1">≈ $12 USD</div>
             </div>
           </CardHeader>
           <CardContent>
-            <ul className="space-y-3 mb-6">
+            <ul className="space-y-2 mb-6">
+              {freeFeatures.map((feature, i) => (
+                <li key={i} className="flex items-center gap-2">
+                  <Check className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                  <span className="text-sm text-gray-600">{feature}</span>
+                </li>
+              ))}
+            </ul>
+            <Button variant="outline" className="w-full" disabled>
+              Current Plan
+            </Button>
+          </CardContent>
+        </Card>
+
+        {/* Monthly Plan */}
+        <Card className="relative border-2 border-purple-500">
+          <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-gradient-to-r from-purple-600 to-pink-600 text-white px-4 py-1 rounded-full text-sm font-semibold whitespace-nowrap">
+            MOST POPULAR
+          </div>
+
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-xl">
+              <Zap className="h-5 w-5 text-blue-600" />
+              Pro Monthly
+            </CardTitle>
+            <div className="mt-3">
+              <span className="text-3xl font-bold">₹600</span>
+              <span className="text-gray-600">/month</span>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <ul className="space-y-2 mb-6">
               {features.map((feature, i) => (
                 <li key={i} className="flex items-center gap-2">
-                  <Check className="h-5 w-5 text-green-600 flex-shrink-0" />
+                  <Check className="h-4 w-4 text-green-600 flex-shrink-0" />
                   <span className="text-sm">{feature}</span>
                 </li>
               ))}
@@ -143,7 +187,7 @@ export default function UpgradePage() {
             <Button
               onClick={() => handleUpgrade('monthly')}
               disabled={loading !== null}
-              className="w-full"
+              className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
               size="lg"
             >
               {loading === 'monthly' ? (
@@ -156,36 +200,34 @@ export default function UpgradePage() {
               )}
             </Button>
 
-            <div className="mt-4 text-center">
-              <p className="text-xs text-gray-500">
-                Supports UPI, Cards, Netbanking, Wallets
-              </p>
+            <div className="mt-3 text-center">
+              <p className="text-xs text-gray-500">Supports UPI, Cards, Netbanking, Wallets</p>
             </div>
           </CardContent>
         </Card>
 
         {/* Yearly Plan */}
-        <Card className="relative border-2 border-purple-500">
-          <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-gradient-to-r from-purple-600 to-pink-600 text-white px-4 py-1 rounded-full text-sm font-semibold">
-            BEST VALUE - Save 17%
+        <Card className="relative">
+          <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-green-600 text-white px-4 py-1 rounded-full text-sm font-semibold whitespace-nowrap">
+            SAVE ₹1,200
           </div>
 
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-2xl">
-              <Crown className="h-6 w-6 text-yellow-500" />
-              Yearly
+            <CardTitle className="flex items-center gap-2 text-xl">
+              <Crown className="h-5 w-5 text-yellow-500" />
+              Pro Yearly
             </CardTitle>
-            <div className="mt-4">
-              <span className="text-4xl font-bold">₹9,999</span>
+            <div className="mt-3">
+              <span className="text-3xl font-bold">₹6,000</span>
               <span className="text-gray-600">/year</span>
-              <div className="text-sm text-gray-500 mt-1">≈ $120 USD</div>
+              <div className="text-sm text-green-600 font-medium mt-1">= ₹500/month</div>
             </div>
           </CardHeader>
           <CardContent>
-            <ul className="space-y-3 mb-6">
+            <ul className="space-y-2 mb-6">
               {features.map((feature, i) => (
                 <li key={i} className="flex items-center gap-2">
-                  <Check className="h-5 w-5 text-green-600 flex-shrink-0" />
+                  <Check className="h-4 w-4 text-green-600 flex-shrink-0" />
                   <span className="text-sm">{feature}</span>
                 </li>
               ))}
@@ -194,7 +236,7 @@ export default function UpgradePage() {
             <Button
               onClick={() => handleUpgrade('yearly')}
               disabled={loading !== null}
-              className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
+              className="w-full"
               size="lg"
             >
               {loading === 'yearly' ? (
@@ -207,10 +249,8 @@ export default function UpgradePage() {
               )}
             </Button>
 
-            <div className="mt-4 text-center">
-              <p className="text-xs text-gray-500">
-                Supports UPI, Cards, Netbanking, Wallets
-              </p>
+            <div className="mt-3 text-center">
+              <p className="text-xs text-gray-500">Supports UPI, Cards, Netbanking, Wallets</p>
             </div>
           </CardContent>
         </Card>

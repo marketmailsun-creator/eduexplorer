@@ -1,5 +1,6 @@
 import { auth } from '@/auth';
 import { SplitLayoutExplore } from '@/components/features/SplitLayoutExplore';
+import { TopicDiscoveryHub } from '@/components/features/TopicDiscoveryHub';
 import { prisma } from '@/lib/db/prisma';
 import { redirect } from 'next/navigation';
 import ExploreClientWrapper from './ExploreClientWrapper';
@@ -22,7 +23,7 @@ export default async function ExplorePage() {
    return (
     <div className="w-full px-6">
       <div className="max-w-7xl mx-auto w-full">
-        {/* <SplitLayoutExplore /> */}
+        <TopicDiscoveryHub />
         <SplitLayoutExplore
           onboardingDone={user?.onboardingDone ?? false}
           userName={user?.name ?? ''}

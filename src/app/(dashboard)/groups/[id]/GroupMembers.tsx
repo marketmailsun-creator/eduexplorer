@@ -3,9 +3,8 @@
 import AvatarImage from '@/components/ui/avatar-image';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Users } from 'lucide-react';
-import Image from 'next/image';
+import { ChallengeButton } from '@/components/groups/ChallengeButton';
 
-// Define proper interfaces
 interface User {
   id: string;
   name: string | null;
@@ -18,12 +17,26 @@ interface Member {
   user: User;
 }
 
+interface Query {
+  id: string;
+  queryText: string;
+}
+
 interface GroupMembersProps {
   members: Member[];
   isAdmin: boolean;
+  currentUserId?: string;
+  groupId?: string;
+  recentQueries?: Query[];
 }
 
-export default function GroupMembers({ members, isAdmin }: GroupMembersProps) {
+export default function GroupMembers({
+  members,
+  isAdmin,
+  currentUserId,
+  groupId,
+  recentQueries = [],
+}: GroupMembersProps) {
   return (
     <Card>
       <CardHeader>
@@ -38,11 +51,11 @@ export default function GroupMembers({ members, isAdmin }: GroupMembersProps) {
             <div key={member.id} className="flex items-center gap-3">
               {member.user.image ? (
                 <AvatarImage
-                src={member.user.image}
-                alt={member.user.name || 'User'}
-                size={32}
-                fallbackText={member.user.name || 'User'}
-              />
+                  src={member.user.image}
+                  alt={member.user.name || 'User'}
+                  size={32}
+                  fallbackText={member.user.name || 'User'}
+                />
               ) : (
                 <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center">
                   <span className="text-purple-600 font-medium text-sm">
@@ -56,6 +69,17 @@ export default function GroupMembers({ members, isAdmin }: GroupMembersProps) {
                   <span className="text-xs text-purple-600">Admin</span>
                 )}
               </div>
+              {currentUserId &&
+                groupId &&
+                member.user.id !== currentUserId &&
+                recentQueries.length > 0 && (
+                  <ChallengeButton
+                    groupId={groupId}
+                    challengeeId={member.user.id}
+                    challengeeName={member.user.name ?? 'this member'}
+                    recentQueries={recentQueries}
+                  />
+                )}
             </div>
           ))}
         </div>

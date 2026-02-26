@@ -20,6 +20,7 @@ import Link from 'next/link';
 import { NotificationPreferences } from '@/components/features/NotificationPreferences';
 import { DeleteAccountSection } from '@/components/features/DeleteAccountSection';
 import { ChangePasswordSection } from '@/components/features/ChangePasswordSection';
+import { ActivityHeatmap } from '@/components/profile/ActivityHeatmap';
 
 // ── Avatar upload component ───────────────────────────────────
 function AvatarUpload({
@@ -324,6 +325,9 @@ export default function ProfilePage() {
             </div>
           </div>
         )}
+
+        {/* ── Activity Heatmap ─────────────────────────────────── */}
+        <ActivityHeatmap />
 
         {/* ── Notification Preferences ─────────────────────────── */}
         <NotificationPreferences />

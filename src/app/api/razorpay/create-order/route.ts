@@ -16,8 +16,9 @@ export async function POST(req: NextRequest) {
 
     const { plan } = await req.json();
 
-    // Amount in smallest currency unit (paise for INR, cents for USD)
-    const amount = plan === 'yearly' ? 999900 : 99900; // ₹9999 or ₹999
+    // Amount in smallest currency unit (paise for INR)
+    // Monthly: ₹600, Yearly: ₹6000 (2 months free vs monthly)
+    const amount = plan === 'yearly' ? 600000 : 60000;
     const currency = 'INR'; // Change to 'USD' for international
 
     // Create Razorpay order
@@ -36,6 +37,7 @@ export async function POST(req: NextRequest) {
       orderId: order.id,
       amount: order.amount,
       currency: order.currency,
+      key: process.env.RAZORPAY_KEY_ID,
     });
   } catch (error) {
     console.error('Create order error:', error);

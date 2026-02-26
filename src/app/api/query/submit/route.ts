@@ -7,12 +7,30 @@ import { analyzeImageWithClaude, extractTextFromPDF, analyzeMultipleImages } fro
 import { prisma } from '@/lib/db/prisma';
 import { z } from 'zod';
 import { ca } from 'zod/v4/locales';
+import { awardXP } from '@/lib/services/xp.service';
+import { updateStreak } from '@/lib/services/streak.service';
+import { checkAndUnlockAchievements } from '@/lib/services/achievement.service';
+import { checkDailyLessonAllowed, incrementDailyLessons } from '@/lib/services/plan-limits.service';
 
 export async function POST(req: NextRequest) {
   try {
     const session = await auth();
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Check daily lesson limit for free users
+    const userPlan = (session.user as { plan?: string }).plan as 'free' | 'pro' ?? 'free';
+    const lessonCheck = await checkDailyLessonAllowed(session.user.id, userPlan);
+    if (!lessonCheck.allowed) {
+      return NextResponse.json(
+        {
+          error: 'Daily lesson limit reached. Upgrade to Pro for unlimited lessons.',
+          remaining: 0,
+          limit: lessonCheck.limit,
+        },
+        { status: 429 }
+      );
     }
 
     // ✅ Parse as FormData to support files + audio
@@ -208,6 +226,13 @@ export async function POST(req: NextRequest) {
 
     await generateContentForQuery(result.queryId);
 
+    // Gamification: increment daily counter, award XP, update streak, check achievements
+    // Run fire-and-forget so errors don't block the response
+    incrementDailyLessons(session.user.id).catch(() => {});
+    awardXP(session.user.id, 5, 'subject_search', { queryId: result.queryId }).catch(() => {});
+    updateStreak(session.user.id).catch(() => {});
+    checkAndUnlockAchievements(session.user.id).catch(() => {});
+
     return NextResponse.json({
       success: true,
       queryId: result.queryId,
@@ -216,8 +241,9 @@ export async function POST(req: NextRequest) {
     });
   } catch (error) {
     console.error('Query submission error:', error);
+    const message = error instanceof Error ? error.message : 'Failed to process query';
     return NextResponse.json(
-      { error: 'Failed to process query' },
+      { error: message },
       { status: 500 }
     );
   }

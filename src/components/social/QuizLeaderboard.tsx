@@ -148,7 +148,7 @@ export function QuizLeaderboard({ queryId }: QuizLeaderboardProps) {
 
                 {/* User Avatar */}
                 <img
-                  src={scoreEntry.user.image || '/default-avatar.png'}
+                  src={scoreEntry.user.image || '/default-avatar.svg'}
                   alt={scoreEntry.user.name || 'User'}
                   className="w-10 h-10 rounded-full border-2 border-white shadow-sm"
                 />

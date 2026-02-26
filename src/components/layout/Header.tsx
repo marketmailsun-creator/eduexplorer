@@ -2,15 +2,40 @@
 
 import { useSession, signOut } from 'next-auth/react';
 import { Button } from '@/components/ui/button';
-import { User, LogOut, Settings, Crown, TrendingUp, Menu, X, Users, BookOpen, Compass } from 'lucide-react';
+import { User, LogOut, Crown, TrendingUp, Menu, X, Users, BookOpen, Compass, Trophy, Swords } from 'lucide-react';
 import Link from 'next/link';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { AvatarWithInitials } from '@/components/ui/avatar-with-initials';
+import { XPBar } from '@/components/gamification/XPBar';
+import { StreakBadge } from '@/components/gamification/StreakBadge';
 
 export function Header() {
   const { data: session } = useSession();
   const [showDropdown, setShowDropdown] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
+  const [totalXP, setTotalXP] = useState(0);
+  const [currentStreak, setCurrentStreak] = useState(0);
+
+  useEffect(() => {
+    if (!session?.user?.id) return;
+    fetch('/api/streak')
+      .then((r) => r.json())
+      .then((data) => setCurrentStreak(data.currentStreak ?? 0))
+      .catch(() => {});
+    fetch('/api/xp/history?page=1')
+      .then((r) => r.json())
+      .then(() => {
+        // Get totalXP from leaderboard endpoint (includes current user XP)
+        fetch('/api/xp/leaderboard')
+          .then((r) => r.json())
+          .then((lb) => {
+            const me = (lb.leaderboard ?? []).find((u: { id: string; totalXP: number }) => u.id === lb.currentUserId);
+            if (me) setTotalXP(me.totalXP);
+          })
+          .catch(() => {});
+      })
+      .catch(() => {});
+  }, [session?.user?.id]);
 
   return (
     <header className="border-b bg-white shadow-sm sticky top-0 z-50">
@@ -37,15 +62,15 @@ export function Header() {
                 </Link>
               </Button>
               <Button variant="ghost" size="sm" asChild>
-                <Link href="/progress">
-                  <BookOpen className="h-4 w-4 mr-1" />
-                  Progress
-                </Link>
-              </Button>
-              <Button variant="ghost" size="sm" asChild>
                 <Link href="/groups">
                   <Users className="h-4 w-4 mr-1" />
                   Groups
+                </Link>
+              </Button>
+              <Button variant="ghost" size="sm" asChild>
+                <Link href="/challenges">
+                  <Swords className="h-4 w-4 mr-1" />
+                  Challenges
                 </Link>
               </Button>
               <Button variant="ghost" size="sm" asChild>
@@ -54,7 +79,23 @@ export function Header() {
                   Leaderboard
                 </Link>
               </Button>
+              <Button variant="ghost" size="sm" asChild>
+                <Link href="/achievements">
+                  <Trophy className="h-4 w-4 mr-1" />
+                  Badges
+                </Link>
+              </Button>
             </nav>
+
+            {/* XP & Streak display */}
+            {session && (
+              <div className="hidden md:flex items-center gap-2 px-2">
+                <StreakBadge streak={currentStreak} />
+                <Link href="/xp">
+                  <XPBar totalXP={totalXP} compact />
+                </Link>
+              </div>
+            )}
 
             <div className="flex items-center gap-2">
               {/* Mobile Menu Button */}
@@ -175,12 +216,39 @@ export function Header() {
                   </Link>
 
                   <Link
+                    href="/challenges"
+                    className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors"
+                    onClick={() => setShowMobileMenu(false)}
+                  >
+                    <Swords className="h-5 w-5 text-purple-600" />
+                    <span className="font-medium">Challenges</span>
+                  </Link>
+
+                  <Link
                     href="/leaderboard"
                     className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors"
                     onClick={() => setShowMobileMenu(false)}
                   >
                     <TrendingUp className="h-5 w-5 text-purple-600" />
                     <span className="font-medium">Leaderboard</span>
+                  </Link>
+
+                  <Link
+                    href="/achievements"
+                    className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors"
+                    onClick={() => setShowMobileMenu(false)}
+                  >
+                    <Trophy className="h-5 w-5 text-purple-600" />
+                    <span className="font-medium">Badges</span>
+                  </Link>
+
+                  <Link
+                    href="/xp"
+                    className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors"
+                    onClick={() => setShowMobileMenu(false)}
+                  >
+                    <span className="text-yellow-500 font-bold text-lg">⚡</span>
+                    <span className="font-medium">XP & Rewards</span>
                   </Link>
                 </nav>
               </div>

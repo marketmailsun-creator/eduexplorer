@@ -83,6 +83,14 @@ export default async function ViewGroupPage({ params }: PageProps) {
     redirect('/groups');
   }
 
+  // Fetch current user's recent queries for the challenge picker
+  const recentQueries = await prisma.query.findMany({
+    where: { userId: session.user.id, status: 'completed' },
+    select: { id: true, queryText: true },
+    orderBy: { createdAt: 'desc' },
+    take: 10,
+  });
+
   return (
     <div className="container mx-auto p-4 sm:p-6 max-w-6xl">
       <div className="flex items-center justify-between mb-6">
@@ -184,7 +192,13 @@ export default async function ViewGroupPage({ params }: PageProps) {
 
         {/* Members Sidebar */}
         <div>
-          <GroupMembers members={group.members} isAdmin={isCreator} />
+          <GroupMembers
+            members={group.members}
+            isAdmin={isCreator}
+            currentUserId={session.user.id}
+            groupId={group.id}
+            recentQueries={recentQueries}
+          />
         </div>
       </div>
     </div>
