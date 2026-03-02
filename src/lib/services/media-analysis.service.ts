@@ -19,7 +19,7 @@ export async function analyzeImageWithClaude(
 
     const message = await anthropic.messages.create({
       model: MODEL,
-      max_tokens: 1024,
+      max_tokens: 2048,
       messages: [
         {
           role: 'user',
@@ -34,16 +34,20 @@ export async function analyzeImageWithClaude(
             },
             {
               type: 'text',
-              text: `Analyze this image thoroughly in an educational context.
+              text: `Analyze this image thoroughly in an educational context. Be exhaustive and precise.
 
-              1. Extract ALL visible text exactly as written — including every word, number, label, and option
-              2. If there are math equations, problems, or questions: write them out fully and precisely
-              3. If it is a multiple choice question: include the question and ALL answer options (A, B, C, D)
-              4. Identify the subject area (e.g. geometry, algebra, biology, history)
-              5. State clearly what question or problem needs to be answered or explained
+1. Extract ALL visible text exactly as written — every word, number, symbol, label, and option
+2. MATH/SCIENCE PROBLEMS: If the image contains a math problem, equation, or science question:
+   a. Write out the full problem statement exactly
+   b. Solve it completely step-by-step, showing all working and calculations
+   c. State the final answer clearly
+   d. Identify the method/concept used (e.g. quadratic formula, integration by parts, Newton's 2nd law)
+3. MULTIPLE CHOICE: Include the question AND all answer options (A, B, C, D) with the correct answer identified
+4. Identify the subject area (algebra, geometry, calculus, physics, chemistry, biology, history, etc.)
+5. If it is a diagram, chart, or graph: describe all labels, axes, values, and what it represents
 
-              Be exhaustive — reproduce every piece of text you can see. This content will be used as a learning query.`,
-                          },
+Reproduce every visible piece of text. This content will be used as a learning and research query.`,
+            },
           ],
         },
       ],
@@ -57,7 +61,7 @@ export async function analyzeImageWithClaude(
     return analysis;
   } catch (error) {
     console.error('Image analysis error:', error);
-    return 'Unable to analyze image';
+    throw error;
   }
 }
 
@@ -237,6 +241,6 @@ export async function analyzeMultipleImages(
     return analysis;
   } catch (error) {
     console.error('Multiple image analysis error:', error);
-    return 'Unable to analyze images';
+    throw error;
   }
 }

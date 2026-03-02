@@ -123,7 +123,7 @@ export function CommentSection({ sharedContentId }: CommentSectionProps) {
     <div className={`${depth > 0 ? 'ml-8 sm:ml-12 mt-4' : 'mt-6'}`}>
       <div className="flex gap-3">
         <img
-          src={comment.user.image || '/default-avatar.png'}
+          src={comment.user.image || '/default-avatar.svg'}
           alt={comment.user.name || 'User'}
           className="w-8 h-8 sm:w-10 sm:h-10 rounded-full flex-shrink-0"
         />
@@ -196,7 +196,7 @@ export function CommentSection({ sharedContentId }: CommentSectionProps) {
             )}
             <div className="flex gap-3">
               <img
-                src={session.user?.image || '/default-avatar.png'}
+                src={session.user?.image || '/default-avatar.svg'}
                 alt="You"
                 className="w-8 h-8 sm:w-10 sm:h-10 rounded-full flex-shrink-0"
               />

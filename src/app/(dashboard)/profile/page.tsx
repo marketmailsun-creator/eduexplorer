@@ -1,25 +1,19 @@
 'use client';
-// ============================================================
-// FILE: src/app/(dashboard)/profile/page.tsx  — REPLACE EXISTING
-// Enhanced profile page with:
-//   • Avatar upload / change
-//   • Member since + learning time estimate
-//   • Streak card (visible without going to Progress)
-//   • Badges earned inline
-//   • Notification Preferences panel
-//   • Plan badge + upgrade CTA
-// ============================================================
 
 import { useEffect, useRef, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import {
   Flame, Trophy, Crown, Calendar, Clock, Camera, Mail,
-  BookOpen, Brain, ChevronRight, Loader2, Upload,
+  BookOpen, Brain, ChevronRight, Loader2, Phone, CheckCircle,
 } from 'lucide-react';
 import Link from 'next/link';
 import { NotificationPreferences } from '@/components/features/NotificationPreferences';
+import { PushNotificationSetup } from '@/components/pwa/PushNotificationSetup';
 import { DeleteAccountSection } from '@/components/features/DeleteAccountSection';
 import { ChangePasswordSection } from '@/components/features/ChangePasswordSection';
+import { ActivityHeatmap } from '@/components/profile/ActivityHeatmap';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 
 // ── Avatar upload component ───────────────────────────────────
 function AvatarUpload({
@@ -34,14 +28,20 @@ function AvatarUpload({
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [preview, setPreview] = useState<string | null>(image);
+  const [imgError, setImgError] = useState(false);
   const [error, setError] = useState('');
+
+  // Reset image error whenever preview changes (e.g. after upload)
+  useEffect(() => {
+    setImgError(false);
+  }, [preview]);
 
   const initials = name
     ? name.trim().split(' ').map(p => p[0]).join('').slice(0, 2).toUpperCase()
     : '?';
 
   const colors = ['bg-indigo-500', 'bg-purple-500', 'bg-pink-500', 'bg-blue-500', 'bg-teal-500'];
-  const color = colors[name.charCodeAt(0) % colors.length] || 'bg-indigo-500';
+  const color = name ? (colors[name.charCodeAt(0) % colors.length] || 'bg-indigo-500') : 'bg-indigo-500';
 
   const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -77,9 +77,14 @@ function AvatarUpload({
   return (
     <div className="relative inline-block">
       <div className={`w-24 h-24 sm:w-28 sm:h-28 rounded-full overflow-hidden ring-4 ring-white
-                        shadow-xl ${!preview ? color : ''} flex items-center justify-center`}>
-        {preview
-          ? <img src={preview} alt={name} className="w-full h-full object-cover" />
+                        shadow-xl ${!(preview && !imgError) ? color : ''} flex items-center justify-center`}>
+        {preview && !imgError
+          ? <img
+              src={preview}
+              alt={name}
+              className="w-full h-full object-cover"
+              onError={() => setImgError(true)}
+            />
           : <span className="text-3xl font-bold text-white">{initials}</span>
         }
         {uploading && (
@@ -138,6 +143,201 @@ function StatPill({
   );
 }
 
+// ── Phone section component ───────────────────────────────────
+function PhoneSection({
+  phone,
+  phoneVerified,
+  onPhoneUpdated,
+}: {
+  phone: string | null;
+  phoneVerified: string | null;
+  onPhoneUpdated: (phone: string) => void;
+}) {
+  type PhoneStep = 'idle' | 'enter_phone' | 'enter_otp';
+  const [step, setStep] = useState<PhoneStep>('idle');
+  const [phoneInput, setPhoneInput] = useState('');
+  const [otpInput, setOtpInput] = useState('');
+  const [sending, setSending] = useState(false);
+  const [verifying, setVerifying] = useState(false);
+  const [phoneError, setPhoneError] = useState('');
+  const [otpError, setOtpError] = useState('');
+  const [resendCountdown, setResendCountdown] = useState(0);
+
+  // Countdown timer
+  useEffect(() => {
+    if (resendCountdown <= 0) return;
+    const t = setTimeout(() => setResendCountdown(c => c - 1), 1000);
+    return () => clearTimeout(t);
+  }, [resendCountdown]);
+
+  const handleSendOtp = async () => {
+    setPhoneError('');
+    const digits = phoneInput.replace(/\D/g, '');
+    if (digits.length !== 10 || !/^[6-9]/.test(digits)) {
+      setPhoneError('Enter a valid 10-digit Indian mobile number');
+      return;
+    }
+    setSending(true);
+    try {
+      const res = await fetch('/api/auth/send-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: `+91${digits}`, channel: 'sms' }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setPhoneError(data.error || 'Failed to send OTP'); return; }
+      setStep('enter_otp');
+      setResendCountdown(60);
+    } catch {
+      setPhoneError('Network error. Please try again.');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const handleVerify = async () => {
+    setOtpError('');
+    if (otpInput.length !== 6) { setOtpError('Enter the 6-digit code'); return; }
+    setVerifying(true);
+    try {
+      const res = await fetch('/api/user/phone', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: `+91${phoneInput.replace(/\D/g, '')}`, code: otpInput }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setOtpError(data.error || 'Verification failed'); return; }
+      onPhoneUpdated(data.phone);
+      setStep('idle');
+      setPhoneInput('');
+      setOtpInput('');
+    } catch {
+      setOtpError('Network error. Please try again.');
+    } finally {
+      setVerifying(false);
+    }
+  };
+
+  const handleCancel = () => {
+    setStep('idle');
+    setPhoneInput('');
+    setOtpInput('');
+    setPhoneError('');
+    setOtpError('');
+  };
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+      <div className="flex items-center gap-2 mb-4">
+        <div className="w-8 h-8 rounded-lg bg-indigo-100 flex items-center justify-center">
+          <Phone className="h-4 w-4 text-indigo-600" />
+        </div>
+        <span className="font-bold text-gray-900 text-sm">Phone Number</span>
+      </div>
+
+      {step === 'idle' && (
+        <div className="flex items-center justify-between">
+          {phone ? (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-700 font-medium">{phone}</span>
+              {phoneVerified && (
+                <span className="flex items-center gap-1 text-xs text-green-600 font-medium">
+                  <CheckCircle className="h-3.5 w-3.5" />
+                  Verified
+                </span>
+              )}
+            </div>
+          ) : (
+            <span className="text-sm text-gray-400">No phone number added</span>
+          )}
+          <button
+            onClick={() => { setStep('enter_phone'); setPhoneInput(phone ? phone.replace('+91', '') : ''); }}
+            className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 px-3 py-1.5 rounded-lg hover:bg-indigo-50 transition-colors"
+          >
+            {phone ? 'Change' : 'Add Phone'}
+          </button>
+        </div>
+      )}
+
+      {step === 'enter_phone' && (
+        <div className="space-y-3">
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1.5">Mobile Number</label>
+            <div className="flex gap-2">
+              <span className="flex items-center px-3 bg-gray-100 border border-gray-200 rounded-lg text-sm font-medium text-gray-600 whitespace-nowrap">
+                🇮🇳 +91
+              </span>
+              <Input
+                type="tel"
+                inputMode="numeric"
+                placeholder="10-digit number"
+                value={phoneInput}
+                onChange={e => setPhoneInput(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                maxLength={10}
+                className="flex-1"
+              />
+            </div>
+            {phoneError && <p className="text-xs text-red-500 mt-1">{phoneError}</p>}
+          </div>
+          <div className="flex gap-2">
+            <Button
+              onClick={handleSendOtp}
+              disabled={sending || phoneInput.replace(/\D/g, '').length !== 10}
+              size="sm"
+              className="bg-indigo-600 hover:bg-indigo-700 flex-1"
+            >
+              {sending ? <><Loader2 className="h-3 w-3 animate-spin mr-1.5" /> Sending...</> : 'Send OTP'}
+            </Button>
+            <Button variant="ghost" size="sm" onClick={handleCancel}>Cancel</Button>
+          </div>
+        </div>
+      )}
+
+      {step === 'enter_otp' && (
+        <div className="space-y-3">
+          <p className="text-xs text-gray-500">OTP sent to <strong>+91 {phoneInput}</strong></p>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1.5">Enter 6-digit OTP</label>
+            <Input
+              type="text"
+              inputMode="numeric"
+              placeholder="000000"
+              value={otpInput}
+              onChange={e => setOtpInput(e.target.value.replace(/\D/g, '').slice(0, 6))}
+              className="text-center text-lg tracking-widest font-mono"
+              maxLength={6}
+            />
+            {otpError && <p className="text-xs text-red-500 mt-1">{otpError}</p>}
+          </div>
+          <div className="flex gap-2">
+            <Button
+              onClick={handleVerify}
+              disabled={verifying || otpInput.length !== 6}
+              size="sm"
+              className="bg-indigo-600 hover:bg-indigo-700 flex-1"
+            >
+              {verifying ? <><Loader2 className="h-3 w-3 animate-spin mr-1.5" /> Verifying...</> : 'Verify'}
+            </Button>
+            <Button variant="ghost" size="sm" onClick={handleCancel}>Cancel</Button>
+          </div>
+          <div className="flex items-center justify-between text-xs">
+            <button onClick={() => { setStep('enter_phone'); setOtpInput(''); }} className="text-gray-400 hover:text-gray-600">
+              ← Change number
+            </button>
+            {resendCountdown > 0 ? (
+              <span className="text-gray-400">Resend in {resendCountdown}s</span>
+            ) : (
+              <button onClick={handleSendOtp} className="text-indigo-600 hover:text-indigo-700 font-medium">
+                Resend OTP
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Main page ─────────────────────────────────────────────────
 export default function ProfilePage() {
   const { data: session, update: updateSession } = useSession();
@@ -159,8 +359,11 @@ export default function ProfilePage() {
 
   const handleAvatarUploaded = async (url: string) => {
     setCurrentImage(url);
-    // Refresh session so header updates too
     await updateSession();
+  };
+
+  const handlePhoneUpdated = (newPhone: string) => {
+    setProfileData((prev: any) => ({ ...prev, phone: newPhone, phoneVerified: new Date().toISOString() }));
   };
 
   if (loading) {
@@ -174,12 +377,10 @@ export default function ProfilePage() {
   const user = profileData;
   const progress = progressData;
 
-  // Member since
   const memberSince = user?.createdAt
     ? new Date(user.createdAt).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })
     : null;
 
-  // Rough learning time estimate (avg 8 min per topic)
   const totalTopics = progress?.topicsAllTime ?? user?._count?.queries ?? 0;
   const estimatedHours = Math.round((totalTopics * 8) / 60);
 
@@ -192,7 +393,6 @@ export default function ProfilePage() {
       {/* ── Hero header ─────────────────────────────────────── */}
       <div className="bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-500
                       px-5 pt-10 pb-20 text-white relative overflow-hidden">
-        {/* Background decoration */}
         <div className="absolute inset-0 opacity-10">
           <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-white" />
           <div className="absolute top-20 -left-6 w-24 h-24 rounded-full bg-white" />
@@ -253,7 +453,6 @@ export default function ProfilePage() {
 
           {/* ── Stat row ─────────────────────────────────────── */}
           <div className="flex gap-3">
-            {/* Streak — most prominent */}
             <div className={`flex-1 flex flex-col items-center py-4 px-3 rounded-2xl
                              ${streak > 0
                                ? 'bg-gradient-to-br from-orange-400 to-red-500 text-white'
@@ -285,6 +484,13 @@ export default function ProfilePage() {
             />
           </div>
         </div>
+
+        {/* ── Phone Number ─────────────────────────────────────── */}
+        <PhoneSection
+          phone={user?.phone ?? null}
+          phoneVerified={user?.phoneVerified ?? null}
+          onPhoneUpdated={handlePhoneUpdated}
+        />
 
         {/* ── Badges ──────────────────────────────────────────── */}
         {badges.length > 0 && (
@@ -324,6 +530,20 @@ export default function ProfilePage() {
             </div>
           </div>
         )}
+
+        {/* ── Activity Heatmap ─────────────────────────────────── */}
+        <ActivityHeatmap />
+
+        {/* ── Push Notifications ───────────────────────────────── */}
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div>
+              <h3 className="font-semibold text-gray-900 text-sm">Push Notifications</h3>
+              <p className="text-xs text-gray-500 mt-0.5">Get study reminders and quiz alerts on this device</p>
+            </div>
+            <PushNotificationSetup />
+          </div>
+        </div>
 
         {/* ── Notification Preferences ─────────────────────────── */}
         <NotificationPreferences />

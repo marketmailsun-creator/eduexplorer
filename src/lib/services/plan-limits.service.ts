@@ -1,22 +1,71 @@
 import { prisma } from '../db/prisma';
+import { redis } from '../db/redis';
 
 // Plan limits configuration
 export const PLAN_LIMITS = {
   free: {
-    audio: 1,
-    presentations: 1,
-    flashcards: 1,
-    quizzes: 1,
+    audio: 0,              // no audio for free plan
+    presentations: 0,      // no presentations for free plan
+    flashcards: 1,         // 1 flashcard set per topic
+    quizzes: 1,            // 1 basic quiz per topic
     audioOnDemand: false,
   },
   pro: {
     audio: 5,
-    presentations: 999, // Unlimited
-    flashcards: 5,
-    quizzes: 999, // Unlimited
+    presentations: 999,    // Unlimited
+    flashcards: 999,       // Unlimited
+    quizzes: 999,          // Unlimited
     audioOnDemand: true,
   },
 };
+
+// Daily lesson limits (AI queries/searches per day)
+const DAILY_LESSON_LIMIT = { free: 5, pro: Infinity } as const;
+
+function todayKey(): string {
+  return new Date().toISOString().split('T')[0];
+}
+
+/**
+ * Get how many AI lessons a free-plan user has remaining today.
+ */
+export async function getDailyLessonsRemaining(
+  userId: string,
+  plan: 'free' | 'pro'
+): Promise<number> {
+  if (plan === 'pro') return Infinity;
+  const key = `daily_lessons:${userId}:${todayKey()}`;
+  const count = (await redis.get<number>(key)) ?? 0;
+  return Math.max(0, DAILY_LESSON_LIMIT.free - count);
+}
+
+/**
+ * Increment the daily lesson counter for a user.
+ */
+export async function incrementDailyLessons(userId: string): Promise<void> {
+  const key = `daily_lessons:${userId}:${todayKey()}`;
+  await redis.incr(key);
+  // TTL of 36h so it survives past midnight without resetting mid-day
+  await redis.expire(key, 36 * 60 * 60);
+}
+
+/**
+ * Check whether the user is allowed to submit a new AI lesson query today.
+ */
+export async function checkDailyLessonAllowed(
+  userId: string,
+  plan: 'free' | 'pro'
+): Promise<{ allowed: boolean; remaining: number; limit: number }> {
+  if (plan === 'pro') {
+    return { allowed: true, remaining: Infinity, limit: Infinity };
+  }
+  const remaining = await getDailyLessonsRemaining(userId, plan);
+  return {
+    allowed: remaining > 0,
+    remaining,
+    limit: DAILY_LESSON_LIMIT.free,
+  };
+}
 
 /**
  * Get user's plan

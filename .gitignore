@@ -47,3 +47,14 @@ redis_data
 
 # video files
 /public/video/*.mp4
+
+# Capacitor native projects — build artifacts
+ios/App/Pods/
+ios/App/build/
+ios/.DS_Store
+android/.gradle/
+android/app/build/
+android/build/
+*.ipa
+*.apk
+*.aab

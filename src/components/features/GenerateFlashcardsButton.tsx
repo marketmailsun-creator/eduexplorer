@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Loader2, Layers } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { UpgradeBanner } from '@/components/features/UpgradeBanner';
 
 interface GenerateFlashcardsButtonProps {
   queryId: string;
@@ -28,7 +29,12 @@ export function GenerateFlashcardsButton({ queryId }: GenerateFlashcardsButtonPr
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to generate flashcards');
+        if (response.status === 403) {
+          setError(data.error || 'Upgrade to Pro to generate more flashcard sets.');
+        } else {
+          throw new Error(data.error || 'Failed to generate flashcards');
+        }
+        return;
       }
 
       console.log('✅ Flashcards generated:', data);
@@ -66,9 +72,9 @@ export function GenerateFlashcardsButton({ queryId }: GenerateFlashcardsButtonPr
       </Button>
 
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded text-sm">
-          {error}
-        </div>
+        error.toLowerCase().includes('upgrade') || error.toLowerCase().includes('pro') || error.toLowerCase().includes('limit')
+          ? <UpgradeBanner message={error} />
+          : <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded text-sm">{error}</div>
       )}
     </div>
   );

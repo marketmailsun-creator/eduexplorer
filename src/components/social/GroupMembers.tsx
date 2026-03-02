@@ -72,7 +72,7 @@ export function GroupMembers({ members, isAdmin, groupId }: GroupMembersProps) {
             >
               {/* Avatar */}
               <img
-                src={member.user.image || '/default-avatar.png'}
+                src={member.user.image || '/default-avatar.svg'}
                 alt={member.user.name || 'User'}
                 className="w-10 h-10 rounded-full border-2 border-gray-200"
               />

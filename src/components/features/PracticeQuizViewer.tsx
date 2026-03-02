@@ -7,9 +7,11 @@
 //   • Score history across sets
 // ============================================================
 
-import { useState, useEffect, useCallback } from 'react';
-import { CheckCircle2, XCircle, ChevronRight, RotateCcw, Loader2, RefreshCw, Sparkles } from 'lucide-react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { CheckCircle2, XCircle, ChevronRight, RotateCcw, Loader2, RefreshCw, Sparkles, Swords } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { UpgradeBanner } from './UpgradeBanner';
 
 interface PracticeQuestion {
   id: number;
@@ -32,6 +34,10 @@ interface PracticeQuizViewerProps {
   quiz: PracticeQuiz;
   queryId: string;
   totalSets?: number;
+  /** When false, hide the "New questions" regenerate button */
+  isOwner?: boolean;
+  /** When set, also submit challenge score on quiz completion */
+  challengeId?: string;
 }
 
 const DIFFICULTY_COLORS: Record<string, string> = {
@@ -40,8 +46,9 @@ const DIFFICULTY_COLORS: Record<string, string> = {
   hard:   'bg-red-100 text-red-700',
 };
 
-export function PracticeQuizViewer({ quiz: initialQuiz, queryId, totalSets = 1 }: PracticeQuizViewerProps) {
+export function PracticeQuizViewer({ quiz: initialQuiz, queryId, totalSets = 1, isOwner = true, challengeId }: PracticeQuizViewerProps) {
   const router = useRouter();
+  const containerRef = useRef<HTMLDivElement>(null);
   const [quiz, setQuiz]                 = useState(initialQuiz);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers]           = useState<Record<number, string>>({});
@@ -51,6 +58,15 @@ export function PracticeQuizViewer({ quiz: initialQuiz, queryId, totalSets = 1 }
   const [regenerating, setRegenerating] = useState(false);
   const [inputValue, setInputValue]     = useState('');
   const [currentSetTotal, setCurrentSetTotal] = useState(totalSets);
+  const [challengeComplete, setChallengeComplete] = useState<{ bothScored: boolean } | null>(null);
+  const [regenError, setRegenError] = useState('');
+
+  // Scroll quiz container into view when complete (prevents page jumping to flashcard section)
+  useEffect(() => {
+    if (quizComplete) {
+      containerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }, [quizComplete]);
 
   const currentQuestion = quiz.questions[currentIndex];
   const userAnswer      = answers[currentQuestion?.id];
@@ -77,6 +93,8 @@ export function PracticeQuizViewer({ quiz: initialQuiz, queryId, totalSets = 1 }
     setQuizComplete(true);
     const correct   = quiz.questions.filter(q => normalize(answers[q.id]) === normalize(q.correctAnswer)).length;
     const timeSpent = Math.floor((Date.now() - startTime) / 1000);
+
+    // Always submit to regular leaderboard (XP + achievements)
     try {
       await fetch('/api/quiz/submit-score', {
         method: 'POST',
@@ -84,16 +102,35 @@ export function PracticeQuizViewer({ quiz: initialQuiz, queryId, totalSets = 1 }
         body: JSON.stringify({ queryId, score: correct, totalQuestions: quiz.totalQuestions, timeSpent }),
       });
     } catch { /* silent */ }
+
+    // Also submit challenge score when in challenge mode
+    if (challengeId) {
+      try {
+        const challengeRes = await fetch('/api/challenge/submit-score', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ challengeId, score: correct, totalQuestions: quiz.totalQuestions, timeSpent }),
+        });
+        const challengeData = await challengeRes.json();
+        setChallengeComplete({ bothScored: !!challengeData.bothScored });
+      } catch { /* silent */ }
+    }
   };
 
   const handleRegenerate = async () => {
     setRegenerating(true);
+    setRegenError('');
     try {
       const res = await fetch('/api/content/quiz/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ queryId, regenerate: true }),
       });
+      if (res.status === 403) {
+        const errData = await res.json();
+        setRegenError(errData.error || 'Plan limit reached. Upgrade to Pro for more quiz sets.');
+        return;
+      }
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed');
 
@@ -132,7 +169,7 @@ export function PracticeQuizViewer({ quiz: initialQuiz, queryId, totalSets = 1 }
                 :              { emoji: '📖', label: 'Keep practicing!', color: 'text-red-600' };
 
     return (
-      <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+      <div ref={containerRef} className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
         <div className="bg-gradient-to-br from-indigo-600 to-purple-600 px-6 py-8 text-center text-white">
           <div className="text-5xl mb-2">{grade.emoji}</div>
           <p className="text-xl font-extrabold">{grade.label}</p>
@@ -145,32 +182,75 @@ export function PracticeQuizViewer({ quiz: initialQuiz, queryId, totalSets = 1 }
           </div>
           <p className={`text-lg font-bold ${grade.color} mb-6`}>{pct}% score</p>
 
-          {/* Regenerate CTA */}
-          <div className="rounded-2xl bg-gradient-to-br from-indigo-50 to-purple-50 border border-indigo-100 p-5 mb-4">
-            <Sparkles className="h-5 w-5 text-indigo-500 mx-auto mb-2" />
-            <p className="font-semibold text-gray-800 text-sm mb-1">Ready for a new challenge?</p>
-            <p className="text-xs text-gray-500 mb-3">Get {quiz.totalQuestions} fresh questions on the same topic — none you've already seen</p>
-            <button
-              onClick={handleRegenerate}
-              disabled={regenerating}
-              className="w-full flex items-center justify-center gap-2 py-3 rounded-xl
-                         bg-gradient-to-r from-indigo-600 to-purple-600 text-white
-                         font-bold text-sm hover:from-indigo-700 hover:to-purple-700
-                         transition-all disabled:opacity-60"
-            >
-              {regenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-              {regenerating ? 'Generating…' : `Generate Quiz Set ${setNumber + 1}`}
-            </button>
-          </div>
+          {/* Regenerate CTA — only for content owner */}
+          {isOwner && !regenError && (
+            <div className="rounded-2xl bg-gradient-to-br from-indigo-50 to-purple-50 border border-indigo-100 p-5 mb-4">
+              <Sparkles className="h-5 w-5 text-indigo-500 mx-auto mb-2" />
+              <p className="font-semibold text-gray-800 text-sm mb-1">Ready for a new challenge?</p>
+              <p className="text-xs text-gray-500 mb-3">Get {quiz.totalQuestions} fresh questions on the same topic — none you've already seen</p>
+              <button
+                onClick={handleRegenerate}
+                disabled={regenerating}
+                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl
+                           bg-gradient-to-r from-indigo-600 to-purple-600 text-white
+                           font-bold text-sm hover:from-indigo-700 hover:to-purple-700
+                           transition-all disabled:opacity-60"
+              >
+                {regenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                {regenerating ? 'Generating…' : `Generate Quiz Set ${setNumber + 1}`}
+              </button>
+            </div>
+          )}
+          {isOwner && regenError && (
+            <div className="mb-4">
+              <UpgradeBanner message={regenError} />
+            </div>
+          )}
 
-          <button
-            onClick={() => { setCurrentIndex(0); setAnswers({}); setShowAnswer(false); setInputValue(''); setQuizComplete(false); }}
-            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl
-                       border-2 border-gray-200 text-gray-600 font-semibold text-sm
-                       hover:bg-gray-50 transition-colors"
-          >
-            <RotateCcw className="h-4 w-4" /> Retry This Set
-          </button>
+          {/* Challenge mode: contextual completion state */}
+          {challengeId ? (
+            challengeComplete?.bothScored ? (
+              <div className="text-center space-y-3">
+                <p className="text-green-700 font-semibold text-sm">⚔️ Both players finished! Check who won.</p>
+                <Link
+                  href={`/challenges/${challengeId}`}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl
+                             bg-purple-600 text-white font-semibold text-sm
+                             hover:bg-purple-700 transition-colors"
+                >
+                  <Swords className="h-4 w-4" /> View Challenge Results
+                </Link>
+              </div>
+            ) : challengeComplete && !challengeComplete.bothScored ? (
+              <div className="px-4 py-3 bg-yellow-50 border border-yellow-200 rounded-xl text-sm text-yellow-700 text-center space-y-2">
+                <p>✅ Score submitted! Waiting for your opponent to play…</p>
+                <Link
+                  href="/challenges"
+                  className="text-purple-600 underline text-xs inline-block"
+                >
+                  Back to Challenges
+                </Link>
+              </div>
+            ) : (
+              <Link
+                href={`/challenges/${challengeId}`}
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl
+                           border-2 border-purple-300 text-purple-700 font-semibold text-sm
+                           hover:bg-purple-50 transition-colors"
+              >
+                <Swords className="h-4 w-4" /> View Challenge Results
+              </Link>
+            )
+          ) : (
+            <button
+              onClick={() => { setCurrentIndex(0); setAnswers({}); setShowAnswer(false); setInputValue(''); setQuizComplete(false); }}
+              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl
+                         border-2 border-gray-200 text-gray-600 font-semibold text-sm
+                         hover:bg-gray-50 transition-colors"
+            >
+              <RotateCcw className="h-4 w-4" /> Retry This Set
+            </button>
+          )}
         </div>
       </div>
     );
@@ -178,29 +258,43 @@ export function PracticeQuizViewer({ quiz: initialQuiz, queryId, totalSets = 1 }
 
   // ── ACTIVE QUIZ ────────────────────────────────────────────
   return (
-    <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+    <div ref={containerRef} className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
 
       {/* Header */}
       <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-        <div>
+        <div className="flex items-center gap-2">
           <span className="text-xs font-bold text-indigo-600 uppercase tracking-wide">Quiz</span>
-          <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600 font-semibold">
+          <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600 font-semibold">
             Set {setNumber}
           </span>
+          {challengeId && (
+            <span className="text-xs px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 font-semibold flex items-center gap-1">
+              <Swords className="h-3 w-3" /> Challenge
+            </span>
+          )}
         </div>
-        <button
-          onClick={handleRegenerate}
-          disabled={regenerating}
-          className="flex items-center gap-1.5 text-xs font-semibold text-gray-500
-                     hover:text-indigo-600 transition-colors disabled:opacity-50"
-        >
-          {regenerating
-            ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            : <RefreshCw className="h-3.5 w-3.5" />
-          }
-          New questions
-        </button>
+        {isOwner && (
+          <button
+            onClick={handleRegenerate}
+            disabled={regenerating}
+            className="flex items-center gap-1.5 text-xs font-semibold text-gray-500
+                       hover:text-indigo-600 transition-colors disabled:opacity-50"
+          >
+            {regenerating
+              ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              : <RefreshCw className="h-3.5 w-3.5" />
+            }
+            New questions
+          </button>
+        )}
       </div>
+
+      {/* Upgrade banner when regen hits plan limit */}
+      {regenError && (
+        <div className="px-5 pt-3">
+          <UpgradeBanner message={regenError} />
+        </div>
+      )}
 
       {/* Progress bar */}
       <div className="h-1.5 bg-gray-100">

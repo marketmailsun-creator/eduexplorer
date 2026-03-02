@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Loader2, Headphones, Crown, Zap } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { UpgradeBanner } from './UpgradeBanner';
 
 interface GenerateAudioButtonProps {
   queryId: string;
@@ -13,10 +14,13 @@ export function GenerateAudioButton({ queryId }: GenerateAudioButtonProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showUpgrade, setShowUpgrade] = useState(false);
+  const [upgradeMessage, setUpgradeMessage] = useState('');
 
   async function handleGenerate() {
     setLoading(true);
     setError('');
+    setShowUpgrade(false);
 
     try {
       // First, get the article content
@@ -24,10 +28,10 @@ export function GenerateAudioButton({ queryId }: GenerateAudioButtonProps) {
       if (!queryResponse.ok) {
         throw new Error('Failed to fetch query data');
       }
-      
+
       const queryData = await queryResponse.json();
       const articleContent = queryData.content.find((c: any) => c.contentType === 'article');
-      
+
       if (!articleContent) {
         throw new Error('Article content not found');
       }
@@ -36,36 +40,22 @@ export function GenerateAudioButton({ queryId }: GenerateAudioButtonProps) {
       const response = await fetch('/api/content/audio/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           contentId: articleContent.id,
-          queryId: queryId 
+          queryId: queryId,
         }),
       });
 
       const data = await response.json();
 
       if (!response.ok) {
-        // Handle plan limit errors with upgrade prompts
         if (response.status === 403) {
-          if (data.error?.includes('Upgrade to Pro')) {
-            // Free user hit limit
-            setError(data.error);
-            setTimeout(() => {
-              if (confirm('Upgrade to Pro to generate more audio? You\'ll get 5 audio generations per topic plus on-demand generation.')) {
-                router.push('/pricing');
-              }
-            }, 100);
-            return;
-          } else if (data.error?.includes('on-demand')) {
-            // Free user trying to regenerate
-            setError('Audio already generated. Upgrade to Pro for on-demand audio generation.');
-            setTimeout(() => {
-              if (confirm('Upgrade to Pro for on-demand audio generation?')) {
-                router.push('/pricing');
-              }
-            }, 100);
-            return;
-          }
+          const msg = data.error?.includes('on-demand')
+            ? 'Audio already generated. Upgrade to Pro for on-demand audio generation.'
+            : (data.error || 'Upgrade to Pro to generate more audio per topic.');
+          setUpgradeMessage(msg);
+          setShowUpgrade(true);
+          return;
         }
         throw new Error(data.error || 'Failed to generate audio');
       }
@@ -86,32 +76,38 @@ export function GenerateAudioButton({ queryId }: GenerateAudioButtonProps) {
           {error}
         </div>
       )}
-      
-      <Button
-        onClick={handleGenerate}
-        disabled={loading}
-        className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
-      >
-        {loading ? (
-          <>
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Generating Audio...
-          </>
-        ) : (
-          <>
-            <Headphones className="mr-2 h-4 w-4" />
-            Generate Audio
-          </>
-        )}
-      </Button>
 
-      <p className="text-xs text-center text-gray-500">
-        <Zap className="h-3 w-3 inline mr-1" />
-        Free: 1 audio per topic
-        <span className="mx-2">•</span>
-        <Crown className="h-3 w-3 inline mr-1" />
-        Pro: 5 audio + on-demand
-      </p>
+      {showUpgrade ? (
+        <UpgradeBanner message={upgradeMessage} dismissible />
+      ) : (
+        <Button
+          onClick={handleGenerate}
+          disabled={loading}
+          className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
+        >
+          {loading ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Generating Audio...
+            </>
+          ) : (
+            <>
+              <Headphones className="mr-2 h-4 w-4" />
+              Generate Audio
+            </>
+          )}
+        </Button>
+      )}
+
+      {!showUpgrade && (
+        <p className="text-xs text-center text-gray-500">
+          <Zap className="h-3 w-3 inline mr-1" />
+          Free: 1 audio per topic
+          <span className="mx-2">•</span>
+          <Crown className="h-3 w-3 inline mr-1" />
+          Pro: 5 audio + on-demand
+        </p>
+      )}
     </div>
   );
 }

@@ -34,56 +34,84 @@ export async function generateDiagrams(
 
   const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
-  const prompt = `Create ${count} simple educational diagrams about "${topic}".
+  const prompt = `Create ${count} educational diagrams about "${topic}".
 
 Content to base diagrams on:
 ${articleText.substring(0, 3000)}
 
-IMPORTANT: Keep diagrams VERY SIMPLE (3-6 nodes max) for clear rendering.
+IMPORTANT: Keep diagrams medium complexity (10 nodes max) for clear rendering.
 
 For each diagram, provide:
 1. Title (short, clear)
 2. Type (flowchart, cycle, hierarchy, comparison, process, concept-map)
 3. Description (one sentence)
-4. Mermaid code (SIMPLE syntax, use clear labels)
+4. Mermaid code (correct syntax for the type)
 
-Mermaid syntax rules:
+CRITICAL — For type "concept-map", use Mermaid MINDMAP syntax:
+mindmap
+  root((Main Topic))
+    Category A
+      Subconcept 1
+      Subconcept 2
+    Category B
+      Subconcept 3
+        Detail
+    Category C
+      Subconcept 4
+
+Mindmap rules:
+- Start with "mindmap" keyword (no graph TD)
+- Use root((Topic)) for the centre node
+- Indent with 2 spaces per level (max 3 levels)
+- Include 3-5 top-level branches
+- Each branch = a key concept or category (2-4 words)
+
+For all other types use standard graph syntax:
 - Use simple node IDs: A, B, C, D, E
 - Keep labels SHORT (1-3 words)
-- Use clear arrow types: --> for flow
-- Avoid complex styling
+- Use --> for flow arrows
 
-Example GOOD diagram:
+Example flowchart:
 graph TD
     A[Start] --> B[Step 1]
     B --> C[Step 2]
     C --> D[End]
 
-Example BAD (too complex):
-graph TD
-    A[This is a very long label that won't render well] --> B[Another long label]
+Example concept-map (MINDMAP only):
+mindmap
+  root((Photosynthesis))
+    Inputs
+      Sunlight
+      Water
+      CO2
+    Outputs
+      Glucose
+      Oxygen
+    Location
+      Chloroplast
+      Leaves
 
 Return ONLY valid JSON:
 {
   "diagrams": [
     {
       "id": 1,
+      "title": "Key Concepts",
+      "type": "concept-map",
+      "description": "Core concepts and relationships",
+      "mermaidCode": "mindmap\\n  root((${topic.substring(0, 20)}))\\n    Category A\\n      Detail 1\\n      Detail 2\\n    Category B\\n      Detail 3\\n    Category C\\n      Detail 4"
+    },
+    {
+      "id": 2,
       "title": "Main Process",
       "type": "process",
       "description": "Shows the basic flow",
       "mermaidCode": "graph TD\\n    A[Input] --> B[Process]\\n    B --> C[Output]"
-    },
-    {
-      "id": 2,
-      "title": "Key Components",
-      "type": "hierarchy",
-      "description": "Main parts breakdown",
-      "mermaidCode": "graph TD\\n    A[Main] --> B[Part 1]\\n    A --> C[Part 2]\\n    A --> D[Part 3]"
     }
   ]
 }
 
-Generate ${count} SIMPLE diagrams now:`;
+Generate ${count} diagrams now (include at least one concept-map using mindmap syntax):`;
 
   try {
     const result = await model.generateContent(prompt);
@@ -122,18 +150,20 @@ function generateTemplateDiagrams(topic: string, content: string, count: number)
 
   const diagrams: Diagram[] = [];
 
-  // Diagram 1: Main Concept Overview
+  // Diagram 1: Main Concept Overview (mindmap)
   if (count >= 1) {
+    const t0 = (keyTerms[0] || 'Aspect 1').substring(0, 15);
+    const t1 = (keyTerms[1] || 'Aspect 2').substring(0, 15);
+    const t2 = (keyTerms[2] || 'Aspect 3').substring(0, 15);
+    const t3 = (keyTerms[3] || 'Detail A').substring(0, 15);
+    const t4 = (keyTerms[4] || 'Detail B').substring(0, 15);
+    const topicShort = topic.substring(0, 20);
     diagrams.push({
       id: 1,
-      title: `${topic} Overview`,
+      title: `${topic} Concept Map`,
       type: 'concept-map',
-      description: 'Main concept and key components',
-      mermaidCode: `graph TD
-    A[${topic}]
-    A --> B[${keyTerms[0] || 'Aspect 1'}]
-    A --> C[${keyTerms[1] || 'Aspect 2'}]
-    A --> D[${keyTerms[2] || 'Aspect 3'}]`,
+      description: 'Core concepts and their relationships',
+      mermaidCode: `mindmap\n  root((${topicShort}))\n    Key Concepts\n      ${t0}\n      ${t1}\n    Applications\n      ${t2}\n      ${t3}\n    Related Topics\n      ${t4}\n      Extensions`,
     });
   }
 

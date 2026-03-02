@@ -13,7 +13,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, BookOpen, Check, CheckCircle2, AlertCircle, Mail } from 'lucide-react';
+import { Loader2, BookOpen, Check, CheckCircle2, AlertCircle, Mail, Smartphone } from 'lucide-react';
 import Link from 'next/link';
 
 function LoginContent() {
@@ -225,12 +225,25 @@ function LoginContent() {
               )}
             </Button>
 
+            {/* Mobile OTP Sign In */}
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full h-11 border-gray-300"
+              asChild
+            >
+              <Link href="/phone-login">
+                <Smartphone className="mr-2 h-5 w-5 text-green-600" />
+                Continue with Mobile (OTP)
+              </Link>
+            </Button>
+
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
                 <div className="w-full border-t border-gray-300" />
               </div>
               <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-white px-2 text-gray-500">or continue with email</span>
+                <span className="bg-white px-2 text-gray-500">or sign in with email</span>
               </div>
             </div>
 

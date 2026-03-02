@@ -1,8 +1,10 @@
 import { auth } from '@/auth';
 import { SplitLayoutExplore } from '@/components/features/SplitLayoutExplore';
+import { TopicDiscoveryHub } from '@/components/features/TopicDiscoveryHub';
 import { prisma } from '@/lib/db/prisma';
 import { redirect } from 'next/navigation';
 import ExploreClientWrapper from './ExploreClientWrapper';
+import { Sparkles } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -20,9 +22,48 @@ export default async function ExplorePage() {
   });
 
    return (
-    <div className="w-full px-6">
+    <div className="w-full px-4 sm:px-6">
       <div className="max-w-7xl mx-auto w-full">
-        {/* <SplitLayoutExplore /> */}
+        {/* Page Hero — bold gradient card */}
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-violet-600 via-purple-600 to-indigo-700 px-6 py-8 sm:px-10 sm:py-10 mt-4 mb-6 text-white shadow-xl">
+          {/* Decorative blobs */}
+          <div className="absolute -top-12 -right-12 w-56 h-56 bg-white/10 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute -bottom-12 -left-12 w-56 h-56 bg-indigo-400/20 rounded-full blur-3xl pointer-events-none" />
+
+          <div className="relative z-10 text-center">
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-white/20 backdrop-blur-sm rounded-full text-xs sm:text-sm font-medium mb-4">
+              <Sparkles className="h-3.5 w-3.5" />
+              <span>AI-Powered Learning Platform</span>
+            </div>
+            <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold tracking-tight mb-3">
+              Learn Anything,{' '}
+              <span className="text-yellow-300">Instantly</span>
+            </h1>
+            <p className="text-sm sm:text-base text-purple-100 max-w-xl mx-auto mb-7">
+              Ask any question — get articles, quizzes, audio, flashcards & more in seconds
+            </p>
+
+            {/* Stats row */}
+            <div className="flex items-center justify-center gap-6 sm:gap-10">
+              <div className="text-center">
+                <div className="text-2xl sm:text-3xl font-bold text-yellow-300">7+</div>
+                <div className="text-xs sm:text-sm text-purple-200 mt-0.5">Content Formats</div>
+              </div>
+              <div className="w-px h-10 bg-white/25" />
+              <div className="text-center">
+                <div className="text-2xl sm:text-3xl font-bold text-yellow-300">4</div>
+                <div className="text-xs sm:text-sm text-purple-200 mt-0.5">Learning Levels</div>
+              </div>
+              <div className="w-px h-10 bg-white/25" />
+              <div className="text-center">
+                <div className="text-2xl sm:text-3xl font-bold text-yellow-300">∞</div>
+                <div className="text-xs sm:text-sm text-purple-200 mt-0.5">Topics</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <TopicDiscoveryHub />
         <SplitLayoutExplore
           onboardingDone={user?.onboardingDone ?? false}
           userName={user?.name ?? ''}

@@ -16,6 +16,7 @@ export async function GET(req: NextRequest) {
     const queries = await prisma.query.findMany({
       where: {
         userId: session.user.id,
+        status: 'completed',
       },
       orderBy: {
         createdAt: 'desc',

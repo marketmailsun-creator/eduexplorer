@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db/prisma';
+import { awardXP } from '@/lib/services/xp.service';
+import { updateStreak } from '@/lib/services/streak.service';
+import { checkAndUnlockAchievements } from '@/lib/services/achievement.service';
 
 export async function POST(req: NextRequest) {
   try {
@@ -59,6 +62,23 @@ export async function POST(req: NextRequest) {
       time: `${timeSpent}s`,
     });
 
+    const percentage = Math.round((score / totalQuestions) * 100);
+
+    // Award XP for passing (>= 50%)
+    const xpAwarded = percentage >= 50 ? 10 : 0;
+    if (xpAwarded > 0) {
+      await awardXP(session.user.id, xpAwarded, 'quiz_completion', {
+        queryId,
+        score,
+        totalQuestions,
+        percentage,
+      });
+    }
+
+    // Update streak and check achievements
+    await updateStreak(session.user.id);
+    const newAchievements = await checkAndUnlockAchievements(session.user.id);
+
     return NextResponse.json({
       success: true,
       quizScore: {
@@ -66,8 +86,10 @@ export async function POST(req: NextRequest) {
         score: quizScore.score,
         totalQuestions: quizScore.totalQuestions,
         timeSpent: quizScore.timeSpent,
-        percentage: Math.round((score / totalQuestions) * 100),
+        percentage,
       },
+      xpAwarded,
+      newAchievements,
     });
   } catch (error) {
     console.error('❌ Submit quiz score error:', error);

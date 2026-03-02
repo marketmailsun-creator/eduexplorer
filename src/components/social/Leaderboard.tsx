@@ -95,7 +95,7 @@ export function Leaderboard({ queryId }: LeaderboardProps) {
 
               {/* User Info */}
               <img
-                src={entry.user.image || '/default-avatar.png'}
+                src={entry.user.image || '/default-avatar.svg'}
                 alt={entry.user.name}
                 className="w-10 h-10 rounded-full"
               />

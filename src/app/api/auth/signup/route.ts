@@ -19,6 +19,7 @@ const signupSchema = z.object({
   name: z.string().min(1),
   dob: z.string(),
   plan: z.enum(['free', 'pro']).optional().default('free'),
+  phone: z.string().optional(), // E.164 format (+91XXXXXXXXXX), pre-verified by OTP on client
 });
 
 function calculateAge(dateOfBirth: Date): number {
@@ -34,7 +35,7 @@ function calculateAge(dateOfBirth: Date): number {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { email, password, name, dob, plan } = signupSchema.parse(body);
+    const { email, password, name, dob, plan, phone } = signupSchema.parse(body);
 
     // Validate age (must be 13+)
     const birthDate = new Date(dob);
@@ -49,6 +50,19 @@ export async function POST(req: NextRequest) {
     const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) {
       return NextResponse.json({ error: 'User already exists' }, { status: 400 });
+    }
+
+    // Validate optional phone (must be E.164 Indian format if provided)
+    let validatedPhone: string | undefined;
+    if (phone) {
+      if (!/^\+91[6-9]\d{9}$/.test(phone)) {
+        return NextResponse.json({ error: 'Invalid phone number format' }, { status: 400 });
+      }
+      const phoneExists = await prisma.user.findUnique({ where: { phone } });
+      if (phoneExists) {
+        return NextResponse.json({ error: 'Phone number already in use' }, { status: 409 });
+      }
+      validatedPhone = phone;
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -68,6 +82,8 @@ export async function POST(req: NextRequest) {
         // emailVerified stays null — set only after they click the link
         emailVerificationToken: verificationToken,
         emailVerificationExpires: verificationExpires,
+        // Phone is optional — pre-verified via OTP on the client before signup
+        ...(validatedPhone ? { phone: validatedPhone, phoneVerified: new Date() } : {}),
       },
     });
 
