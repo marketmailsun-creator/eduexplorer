@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 
 interface PresentationSlide {
   id: number;
-  type: 'title' | 'definition' | 'concept' | 'bullet-points' | 'equation' | 'comparison' | 'summary';
+  type: 'title' | 'definition' | 'concept' | 'bullet-points' | 'equation' | 'comparison' | 'summary' | 'stat-highlight' | 'key-concept' | 'icon-list';
   duration?: number;
   title?: string;
   subtitle?: string;
@@ -18,6 +18,17 @@ interface PresentationSlide {
   leftContent?: string[];
   rightContent?: string[];
   background: string;
+  // stat-highlight
+  stat?: string;
+  statLabel?: string;
+  context?: string;
+  icon?: string;
+  // key-concept
+  concept?: string;
+  explanation?: string;
+  example?: string;
+  // icon-list
+  items?: Array<{ icon: string; text: string }>;
 }
 
 interface PresentationData {
@@ -342,6 +353,73 @@ function SlideRenderer({ slide }: { slide: PresentationSlide }) {
               ))}
             </ul>
           )}
+        </div>
+      )}
+
+      {/* Stat Highlight Slide */}
+      {slide.type === 'stat-highlight' && (
+        <div className="flex flex-col items-center justify-center h-full text-center space-y-2 sm:space-y-3 md:space-y-4 px-4 sm:px-6 animate-fade-in">
+          <div className="text-3xl sm:text-4xl md:text-5xl">{slide.icon ?? '📊'}</div>
+          <h2 className={`text-xs sm:text-sm md:text-base font-semibold uppercase tracking-widest opacity-75 ${textColor}`}>
+            {slide.title}
+          </h2>
+          <div className={`text-4xl sm:text-6xl md:text-7xl lg:text-8xl font-extrabold leading-none ${textColor}`}>
+            {slide.stat}
+          </div>
+          <p className={`text-sm sm:text-base md:text-xl lg:text-2xl font-semibold ${textColor}`}>
+            {slide.statLabel}
+          </p>
+          {slide.context && (
+            <p className={`text-xs sm:text-sm max-w-xs sm:max-w-md opacity-80 leading-relaxed ${textColor}`}>
+              {slide.context}
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Key Concept Slide */}
+      {slide.type === 'key-concept' && (
+        <div className="flex flex-col items-center justify-center h-full space-y-2 sm:space-y-3 md:space-y-4 px-4 sm:px-6 text-center animate-fade-in">
+          <div className="text-3xl sm:text-4xl">{slide.icon ?? '💡'}</div>
+          <h2 className={`text-xs sm:text-sm font-semibold uppercase tracking-widest opacity-75 ${textColor}`}>
+            {slide.title}
+          </h2>
+          <div className="bg-white/15 backdrop-blur-sm rounded-xl sm:rounded-2xl px-4 sm:px-6 py-3 sm:py-4 border border-white/20 max-w-xs sm:max-w-lg w-full">
+            <p className={`text-lg sm:text-2xl md:text-3xl lg:text-4xl font-extrabold ${textColor}`}>
+              {slide.concept}
+            </p>
+          </div>
+          <p className={`text-xs sm:text-sm md:text-base max-w-xs sm:max-w-md leading-relaxed ${textColor}`}>
+            {slide.explanation}
+          </p>
+          {slide.example && (
+            <div className="bg-white/10 rounded-lg sm:rounded-xl px-3 sm:px-4 py-2 max-w-xs sm:max-w-md w-full">
+              <p className={`text-xs sm:text-sm italic opacity-80 ${textColor}`}>
+                📌 {slide.example}
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Icon List Slide */}
+      {slide.type === 'icon-list' && (
+        <div className="flex flex-col h-full px-3 sm:px-6 py-3 sm:py-4 space-y-2 sm:space-y-3 animate-slide-up">
+          <h2 className={`text-sm sm:text-base md:text-lg lg:text-xl font-bold ${textColor} mb-1`}>
+            {slide.title}
+          </h2>
+          <ul className="space-y-1.5 sm:space-y-2 md:space-y-3 flex-1">
+            {(slide.items ?? []).map((item, index) => (
+              <li
+                key={index}
+                className="flex items-center gap-2 sm:gap-3 bg-white/10 rounded-lg sm:rounded-xl px-3 py-2 sm:py-2.5 animate-fade-in"
+                style={{ animationDelay: `${index * 0.15}s` }}
+              >
+                <span className="text-lg sm:text-xl md:text-2xl flex-shrink-0">{item.icon}</span>
+                <span className={`text-xs sm:text-sm font-medium leading-snug ${textColor}`}>{item.text}</span>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
     </div>

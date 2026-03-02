@@ -39,14 +39,17 @@ export async function checkAndUnlockAchievements(
   const streak = streakRecord?.currentStreak ?? 0;
 
   // Check for a perfect quiz (score == totalQuestions)
-  const hasPerfectQuiz = quizCount > 0
-    ? (await prisma.$queryRaw<{ count: string }[]>`
+  // Note: must capture result first — if queryRaw returns [], [0]?.count is undefined
+  // and undefined !== '0' would incorrectly evaluate to true.
+  const perfectQuizRows = quizCount > 0
+    ? await prisma.$queryRaw<{ count: string }[]>`
         SELECT COUNT(*) as count FROM "quiz_scores"
         WHERE "userId" = ${userId}
           AND score = "totalQuestions"
         LIMIT 1
-      `)[0]?.count !== '0'
-    : false;
+      `
+    : [];
+  const hasPerfectQuiz = perfectQuizRows.length > 0 && Number(perfectQuizRows[0].count) > 0;
 
   for (const achievement of allAchievements) {
     if (unlockedIds.has(achievement.id)) continue;

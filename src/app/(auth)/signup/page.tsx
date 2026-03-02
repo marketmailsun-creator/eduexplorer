@@ -6,12 +6,12 @@
 // Google signup still works instantly (no email verification needed).
 // ============================================================
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, Check, X, Zap, Crown, BookOpen, Smartphone } from 'lucide-react';
+import { Loader2, Check, Zap, Crown, BookOpen, Smartphone, CheckCircle, Phone } from 'lucide-react';
 import Link from 'next/link';
 import { signIn } from 'next-auth/react';
 
@@ -23,6 +23,68 @@ export default function SignupPage() {
   const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState('');
   const [selectedPlan, setSelectedPlan] = useState<PlanType>('free');
+
+  // Phone OTP state
+  const [phone, setPhone] = useState('');
+  const [phoneStep, setPhoneStep] = useState<'idle' | 'enter_otp'>('idle');
+  const [otpCode, setOtpCode] = useState('');
+  const [phoneVerified, setPhoneVerified] = useState(false);
+  const [sendingOtp, setSendingOtp] = useState(false);
+  const [otpError, setOtpError] = useState('');
+  const [resendCountdown, setResendCountdown] = useState(0);
+
+  // Countdown timer for OTP resend
+  useEffect(() => {
+    if (resendCountdown <= 0) return;
+    const t = setTimeout(() => setResendCountdown(c => c - 1), 1000);
+    return () => clearTimeout(t);
+  }, [resendCountdown]);
+
+  const handleSendOtp = async () => {
+    setOtpError('');
+    const digits = phone.replace(/\D/g, '');
+    if (digits.length !== 10 || !/^[6-9]/.test(digits)) {
+      setOtpError('Enter a valid 10-digit Indian mobile number');
+      return;
+    }
+    setSendingOtp(true);
+    try {
+      const res = await fetch('/api/auth/send-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: `+91${digits}`, channel: 'sms' }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setOtpError(data.error || 'Failed to send OTP'); return; }
+      setPhoneStep('enter_otp');
+      setResendCountdown(60);
+    } catch {
+      setOtpError('Network error. Please try again.');
+    } finally {
+      setSendingOtp(false);
+    }
+  };
+
+  const handleVerifyOtp = async () => {
+    setOtpError('');
+    if (otpCode.length !== 6) { setOtpError('Enter the 6-digit code'); return; }
+    setSendingOtp(true);
+    try {
+      const res = await fetch('/api/auth/verify-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: `+91${phone.replace(/\D/g, '')}`, code: otpCode }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setOtpError(data.error || 'Invalid OTP'); return; }
+      setPhoneVerified(true);
+      setPhoneStep('idle');
+    } catch {
+      setOtpError('Network error. Please try again.');
+    } finally {
+      setSendingOtp(false);
+    }
+  };
 
   async function handleGoogleSignIn() {
     setGoogleLoading(true);
@@ -48,10 +110,15 @@ export default function SignupPage() {
     const dob = formData.get('dob') as string;
 
     try {
+      const phoneDigits = phone.replace(/\D/g, '');
       const response = await fetch('/api/auth/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, name, dob, plan: selectedPlan }),
+        body: JSON.stringify({
+          email, password, name, dob, plan: selectedPlan,
+          // Include phone only if it was OTP-verified
+          ...(phoneVerified && phoneDigits.length === 10 ? { phone: `+91${phoneDigits}` } : {}),
+        }),
       });
 
       const data = await response.json();
@@ -198,6 +265,91 @@ export default function SignupPage() {
                   max={new Date(new Date().setFullYear(new Date().getFullYear() - 13)).toISOString().split('T')[0]}
                 />
                 <p className="text-xs text-gray-500 mt-1">You must be 13 or older</p>
+              </div>
+
+              {/* Optional phone number with OTP verification */}
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  Mobile Number <span className="text-gray-400 font-normal">(optional)</span>
+                </label>
+                {phoneVerified ? (
+                  <div className="flex items-center gap-2 h-11 px-3 bg-green-50 border border-green-200 rounded-md">
+                    <CheckCircle className="h-4 w-4 text-green-600 flex-shrink-0" />
+                    <span className="text-sm text-green-700 font-medium">+91 {phone} — Verified</span>
+                    <button
+                      type="button"
+                      onClick={() => { setPhoneVerified(false); setPhone(''); setPhoneStep('idle'); setOtpCode(''); }}
+                      className="ml-auto text-xs text-gray-400 hover:text-gray-600"
+                    >
+                      Change
+                    </button>
+                  </div>
+                ) : phoneStep === 'enter_otp' ? (
+                  <div className="space-y-2">
+                    <p className="text-xs text-gray-500">OTP sent to +91 {phone}</p>
+                    <div className="flex gap-2">
+                      <Input
+                        type="text"
+                        inputMode="numeric"
+                        placeholder="000000"
+                        value={otpCode}
+                        onChange={e => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                        className="text-center tracking-widest font-mono"
+                        maxLength={6}
+                      />
+                      <Button
+                        type="button"
+                        onClick={handleVerifyOtp}
+                        disabled={sendingOtp || otpCode.length !== 6}
+                        className="bg-indigo-600 hover:bg-indigo-700 whitespace-nowrap"
+                      >
+                        {sendingOtp ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Verify'}
+                      </Button>
+                    </div>
+                    <div className="flex items-center justify-between text-xs">
+                      <button type="button" onClick={() => { setPhoneStep('idle'); setOtpCode(''); }} className="text-gray-400 hover:text-gray-600">
+                        ← Change number
+                      </button>
+                      {resendCountdown > 0 ? (
+                        <span className="text-gray-400">Resend in {resendCountdown}s</span>
+                      ) : (
+                        <button type="button" onClick={handleSendOtp} className="text-indigo-600 hover:text-indigo-700 font-medium">
+                          Resend OTP
+                        </button>
+                      )}
+                    </div>
+                    {otpError && <p className="text-xs text-red-500">{otpError}</p>}
+                  </div>
+                ) : (
+                  <div className="space-y-1.5">
+                    <div className="flex gap-2">
+                      <span className="flex items-center px-3 bg-gray-100 border border-gray-200 rounded-md text-sm font-medium text-gray-600 whitespace-nowrap">
+                        🇮🇳 +91
+                      </span>
+                      <Input
+                        type="tel"
+                        inputMode="numeric"
+                        placeholder="10-digit number"
+                        value={phone}
+                        onChange={e => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                        disabled={loading || googleLoading}
+                        className="flex-1 h-11"
+                        maxLength={10}
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={handleSendOtp}
+                        disabled={sendingOtp || phone.replace(/\D/g, '').length !== 10 || loading}
+                        className="whitespace-nowrap"
+                      >
+                        {sendingOtp ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Send OTP'}
+                      </Button>
+                    </div>
+                    {otpError && <p className="text-xs text-red-500">{otpError}</p>}
+                    <p className="text-xs text-gray-400">Add for faster login & account recovery</p>
+                  </div>
+                )}
               </div>
 
               {error && (

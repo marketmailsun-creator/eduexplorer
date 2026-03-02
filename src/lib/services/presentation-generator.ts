@@ -5,7 +5,7 @@ const genAI = GOOGLE_API_KEY ? new GoogleGenerativeAI(GOOGLE_API_KEY) : null;
 
 export interface PresentationSlide {
   id: number;
-  type: 'title' | 'definition' | 'bullet-points' | 'equation' | 'comparison' | 'summary';
+  type: 'title' | 'definition' | 'bullet-points' | 'equation' | 'comparison' | 'summary' | 'stat-highlight' | 'key-concept' | 'icon-list';
   title?: string;
   subtitle?: string;
   content?: string;
@@ -14,6 +14,17 @@ export interface PresentationSlide {
   leftColumn?: string[];
   rightColumn?: string[];
   background: 'gradient-blue' | 'gradient-purple' | 'dark' | 'light';
+  // stat-highlight fields
+  stat?: string;
+  statLabel?: string;
+  context?: string;
+  icon?: string;
+  // key-concept fields
+  concept?: string;
+  explanation?: string;
+  example?: string;
+  // icon-list fields
+  items?: Array<{ icon: string; text: string }>;
 }
 
 export interface Presentation {
@@ -48,15 +59,20 @@ export async function generatePresentation(
 Based on this content:
 ${articleText.substring(0, 4000)}
 
-Generate 6-10 slides. Each slide should be clear and focused on ONE concept.
+Generate 7-10 slides. Each slide should be clear and focused on ONE concept.
 
-Slide types:
-1. title - Opening slide with main topic
-2. definition - Key term definition
-3. bullet-points - List of key points (3-5 items)
-4. equation - Mathematical/chemical equation
-5. comparison - Compare two concepts (left vs right columns)
-6. summary - Recap key takeaways
+Slide types available:
+1. title - Opening slide with main topic (fields: title, subtitle, background)
+2. definition - Key term definition (fields: title, content, background)
+3. bullet-points - List of key points 3-5 items (fields: title, points[], background)
+4. equation - Mathematical/chemical equation (fields: title, equation, content, background)
+5. comparison - Compare two concepts (fields: title, leftTitle, rightTitle, leftContent[], rightContent[], background)
+6. summary - Recap key takeaways (fields: title, points[], background)
+7. stat-highlight - A striking statistic or key number (fields: title, stat, statLabel, context, icon, background)
+8. key-concept - Single most important definition, centered boldly (fields: title, concept, explanation, example, icon, background)
+9. icon-list - List items each with an emoji icon (fields: title, items[{icon, text}], background)
+
+IMPORTANT: Include at least one "stat-highlight" or "key-concept" slide AND at least one "icon-list" slide for visual variety.
 
 Return ONLY valid JSON in this EXACT format:
 {
@@ -73,28 +89,45 @@ Return ONLY valid JSON in this EXACT format:
     },
     {
       "id": 2,
-      "type": "definition",
-      "title": "Key Term",
-      "content": "Clear, concise definition in one sentence",
+      "type": "key-concept",
+      "title": "Core Concept",
+      "concept": "The Key Term",
+      "explanation": "One clear sentence explaining what it means.",
+      "example": "Real-world example in one sentence.",
+      "icon": "💡",
       "background": "dark"
     },
     {
       "id": 3,
+      "type": "stat-highlight",
+      "title": "Did You Know?",
+      "stat": "70%",
+      "statLabel": "of Earth is covered by water",
+      "context": "Brief 1-2 sentence context for why this stat matters.",
+      "icon": "💧",
+      "background": "gradient-blue"
+    },
+    {
+      "id": 4,
+      "type": "icon-list",
+      "title": "Key Benefits",
+      "items": [
+        {"icon": "⚡", "text": "Short description (max 10 words)"},
+        {"icon": "🧠", "text": "Short description (max 10 words)"},
+        {"icon": "🌱", "text": "Short description (max 10 words)"},
+        {"icon": "🔬", "text": "Short description (max 10 words)"}
+      ],
+      "background": "gradient-purple"
+    },
+    {
+      "id": 5,
       "type": "bullet-points",
       "title": "Key Concepts",
       "points": ["Point 1", "Point 2", "Point 3"],
       "background": "light"
     },
     {
-      "id": 4,
-      "type": "equation",
-      "title": "Important Equation",
-      "equation": "E = mc²",
-      "content": "Brief explanation of what it means",
-      "background": "gradient-purple"
-    },
-    {
-      "id": 5,
+      "id": 6,
       "type": "summary",
       "title": "Key Takeaways",
       "points": ["Takeaway 1", "Takeaway 2", "Takeaway 3"],
@@ -104,10 +137,12 @@ Return ONLY valid JSON in this EXACT format:
 }
 
 Rules:
-- Keep text SHORT (10-15 words per bullet point)
+- Keep text SHORT (10-15 words per bullet/item)
 - One concept per slide
-- Use simple, clear language
-- Alternate background colors for visual interest
+- Use simple, clear language for ${level} level
+- Alternate background colors: gradient-blue, gradient-purple, dark, light
+- For icon-list: choose emojis that visually represent the content
+- For stat-highlight: pick a real, interesting statistic from the content
 
 Generate the presentation JSON now:`;
 

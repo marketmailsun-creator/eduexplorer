@@ -106,8 +106,8 @@ export async function POST(req: NextRequest) {
           mediaContextParts.push(`[Images content: ${analysis}]`);
           console.log('✅ Multiple images analyzed');
         }
-      }catch (error) {
-        console.error('❌ Image analysis failed:', MediaError);
+      } catch (error) {
+        console.error('❌ Image analysis failed:', error);
         return NextResponse.json(
           { error: 'Failed to analyze the attached image. Please try again or type your question manually.' },
           { status: 422 }

@@ -11,15 +11,6 @@ const nextConfig = {
     },
   },
 
-  images: {
-    remotePatterns: [
-      {
-        protocol: 'https',
-        hostname: '**.elevenlabs.io',
-      },
-    ],
-  },
-
   env: {
     NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
   },

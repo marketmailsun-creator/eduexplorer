@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { LoadingProgressScreen } from '@/components/features/LoadingProgressScreen';
@@ -31,7 +32,6 @@ import {
   Brain,
   BarChart3,
   Network,
-  Sparkles,
   Zap,
   Target,
   Award,
@@ -81,6 +81,8 @@ interface SplitLayoutExploreProps {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyItems, setHistoryItems] = useState<HistoryItem[]>([]);
   const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
+  const [similarContent, setSimilarContent] = useState<Array<{type: 'own' | 'public'; id: string; queryText: string}>>([]);
+  const [showSimilar, setShowSimilar] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -92,6 +94,21 @@ interface SplitLayoutExploreProps {
   const [loadingQuery, setLoadingQuery] = useState('');
   const [hasMediaLoading, setHasMediaLoading] = useState(false);
   
+  const TRENDING = [
+    'Artificial Intelligence',
+    'Climate Change',
+    'Quantum Computing',
+    'UPSC Preparation',
+    'JEE Chemistry',
+    'Personal Finance India',
+    'Web Development',
+    'Human Psychology',
+    'Space Exploration',
+  ];
+
+   const navigate = (topic: string) => {
+    router.push(`/explore?q=${encodeURIComponent(topic)}`);
+  };
   // Load history when sidebar opens
   useEffect(() => {
     if (showHistory) {
@@ -302,6 +319,41 @@ interface SplitLayoutExploreProps {
     setIsPlayingAudio(false);
   };
 
+  const proceedWithSubmit = async () => {
+    setShowSimilar(false);
+    setSimilarContent([]);
+    const hasMedia = attachedFiles.length > 0 || !!audioBlob;
+    setLoading(true);
+    setLoadingQuery(query || 'your attached content');
+    setHasMediaLoading(hasMedia);
+    setError('');
+
+    try {
+      const formData = new FormData();
+      formData.append('query', query);
+      formData.append('learningLevel', level);
+      attachedFiles.forEach((attachedFile) => {
+        formData.append('files', attachedFile.file);
+      });
+      if (audioBlob) {
+        formData.append('audio', audioBlob, 'recording.webm');
+      }
+      const response = await fetch('/api/query/submit', {
+        method: 'POST',
+        body: formData,
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to submit query');
+      }
+      router.push(`/results/${data.queryId}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+      setLoading(false);
+      setLoadingQuery('');
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const hasMedia = attachedFiles.length > 0 || !!audioBlob;
@@ -309,53 +361,23 @@ interface SplitLayoutExploreProps {
       setError('Please enter a question, or attach an image/file.');
       return;
     }
-    setLoading(true);
-    setLoadingQuery(query || 'your attached content');
-    setHasMediaLoading(hasMedia);
-    setError('');
-    console.log('📤 Submitting query...');
-    console.log('  - Query:', query);
-    console.log('  - Level:', level);
-    console.log('  - Files:', attachedFiles.length);
-    console.log('  - Audio:', audioBlob ? 'Yes' : 'No');
 
-    try {
-      // ✅ Use FormData so files and audio are included
-      const formData = new FormData();
-      formData.append('query', query);
-      formData.append('learningLevel', level);
-
-      // Attach image/document files
-      attachedFiles.forEach((attachedFile) => {
-        formData.append('files', attachedFile.file);
-        console.log('  📎 Adding file:', attachedFile.file.name);
-      });
-
-      // Attach audio recording
-      if (audioBlob) {
-        formData.append('audio', audioBlob, 'recording.webm');
-        console.log('  🎤 Adding audio recording');
-      }
-
-      const response = await fetch('/api/query/submit', {
-        method: 'POST',
-        body: formData, // ✅ No Content-Type header — browser sets it with boundary
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to submit query');
-      }
-
-      console.log('✅ Query submitted successfully:', data.queryId);
-      router.push(`/results/${data.queryId}`);
-    } catch (err) {
-      console.error('❌ Submit error:', err);
-      setError(err instanceof Error ? err.message : 'An error occurred');
-      setLoading(false);
-      setLoadingQuery('');
+    // Check for similar existing content first (text-only queries)
+    if (query.trim().length >= 3 && !hasMedia) {
+      try {
+        const simRes = await fetch(`/api/query/similar?q=${encodeURIComponent(query.trim())}`);
+        if (simRes.ok) {
+          const { similar } = await simRes.json();
+          if (similar && similar.length > 0) {
+            setSimilarContent(similar);
+            setShowSimilar(true);
+            return;
+          }
+        }
+      } catch { /* ignore similarity check errors */ }
     }
+
+    await proceedWithSubmit();
   };
 
   const capabilities = [
@@ -399,24 +421,6 @@ interface SplitLayoutExploreProps {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-purple-50 pb-16 md:pb-8">
       <div className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-6 md:py-8">
-        {/* ✅ Continue Learning strip */}
-      
-        {/* Hero Section - Mobile Optimized */}
-        <div className="text-center mb-6 sm:mb-8 space-y-2 sm:space-y-4">
-          <div className="inline-flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-blue-100 text-blue-700 rounded-full text-xs sm:text-sm font-medium mb-2 sm:mb-4 animate-pulse">
-            <Sparkles className="h-3 w-3 sm:h-4 sm:w-4" />
-            <span className="hidden xs:inline">AI-Powered Learning Platform</span>
-            <span className="xs:hidden">AI Learning</span>
-          </div>
-          
-          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent px-4">
-            Learn Anything, Instantly
-          </h1>
-          
-          <p className="text-sm sm:text-base md:text-lg text-gray-600 max-w-2xl mx-auto px-4">
-            Ask any question and get comprehensive learning materials
-          </p>
-        </div>
         <div className="flex justify-end mb-4 sm:mb-5">
           <DailyGoalWidget compact />
         </div>
@@ -509,6 +513,41 @@ interface SplitLayoutExploreProps {
                   </div>
                 )}
 
+                {/* Similar content found — let user choose */}
+                {showSimilar && similarContent.length > 0 && (
+                  <div className="rounded-xl border border-violet-200 bg-violet-50 p-4 space-y-3">
+                    <p className="text-sm font-semibold text-violet-800">📚 Similar content already exists</p>
+                    <p className="text-xs text-violet-600">We found topics similar to yours. Open an existing one or generate fresh content.</p>
+                    <div className="space-y-1.5">
+                      {similarContent.map(item => (
+                        <Link
+                          key={item.id}
+                          href={`/results/${item.id}`}
+                          className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white border border-violet-200 text-xs text-violet-800 hover:bg-violet-100 transition-colors font-medium truncate"
+                        >
+                          {item.type === 'own' ? '📖' : '🌐'} {item.queryText}
+                        </Link>
+                      ))}
+                    </div>
+                    <div className="flex gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={proceedWithSubmit}
+                        className="flex-1 py-2 rounded-lg bg-violet-600 text-white text-xs font-semibold hover:bg-violet-700 transition-colors"
+                      >
+                        Generate New
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setShowSimilar(false); setSimilarContent([]); }}
+                        className="flex-1 py-2 rounded-lg border border-violet-300 text-violet-700 text-xs font-semibold hover:bg-white transition-colors"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 {/* Action Buttons - Mobile Optimized */}
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2">
                   {/* Media Buttons - Full Width on Mobile */}
@@ -563,7 +602,7 @@ interface SplitLayoutExploreProps {
             </div>
 
             {/* Example Topics - Mobile Optimized */}
-            <div className="mt-4 sm:mt-6 text-center">
+            {/* <div className="mt-4 sm:mt-6 text-center">
               <p className="text-xs sm:text-sm font-medium text-gray-700 mb-2 sm:mb-3">
                 <span className="hidden sm:inline">Try these popular topics:</span>
                 <span className="sm:hidden">Try these:</span>
@@ -574,6 +613,25 @@ interface SplitLayoutExploreProps {
                     key={idx}
                     onClick={() => setQuery(topic)}
                     className="px-2 sm:px-3 py-1 sm:py-1.5 bg-white text-gray-700 rounded-full text-xs hover:bg-blue-50 hover:text-blue-600 transition-colors border border-gray-200 hover:border-blue-300"
+                  >
+                    {topic}
+                  </button>
+                ))}
+              </div>
+            </div> */}
+            {/* Trending topics */}
+            <div className="mt-4 sm:mt-6">
+              <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
+                🔥 Trending Topics
+              </h2>
+              <div className="flex flex-wrap gap-2">
+                {TRENDING.map(topic => (
+                  <button
+                    key={topic}
+                    onClick={() => navigate(topic)}
+                    className="px-3 py-1.5 text-sm bg-white border border-gray-200 rounded-full
+                              hover:border-purple-400 hover:text-purple-700 hover:bg-purple-50
+                              transition-colors text-gray-700 shadow-sm"
                   >
                     {topic}
                   </button>

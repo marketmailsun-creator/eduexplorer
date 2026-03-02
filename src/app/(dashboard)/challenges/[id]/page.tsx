@@ -125,16 +125,30 @@ export default async function ChallengeDetailPage({ params }: PageProps) {
           )}
 
           {/* Actions */}
-          <div className="flex justify-center gap-3">
+          <div className="flex flex-col items-center gap-3">
             {isPending && !isChallenger && (
               <ChallengeRespondButtons challengeId={challenge.id} />
             )}
-            {(isAccepted || (isPending && isChallenger)) && (
+            {(isAccepted || (isPending && isChallenger)) && myScore === null && (
               <Link
-                href={`/query/${challenge.query.id}`}
+                href={`/results/${challenge.query.id}?challenge=${challenge.id}`}
                 className="px-5 py-2.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium"
               >
                 Take Quiz Now
+              </Link>
+            )}
+            {isAccepted && myScore !== null && !isCompleted && (
+              <div className="px-4 py-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-700 text-center">
+                ✅ You scored <strong>{myScore} pts</strong> — waiting for{' '}
+                {opponent?.name ?? 'your opponent'} to play!
+              </div>
+            )}
+            {isCompleted && (
+              <Link
+                href="/challenges"
+                className="px-5 py-2.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium"
+              >
+                Back to Challenges
               </Link>
             )}
           </div>

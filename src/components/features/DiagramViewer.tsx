@@ -2,7 +2,7 @@
 
 import { Card, CardContent } from '@/components/ui/card';
 import { useState, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Loader2, ZoomIn, ZoomOut, RotateCcw, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface Diagram {
@@ -19,8 +19,11 @@ interface DiagramViewerProps {
 
 export function DiagramViewer({ diagrams }: DiagramViewerProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [renderedDiagrams, setRenderedDiagrams] = useState<Map<number, string>>(new Map());
-  const [loading, setLoading] = useState(false);
+  const [diagramUrls, setDiagramUrls] = useState<Map<number, string>>(new Map());
+  const [errorIds, setErrorIds] = useState<Set<number>>(new Set());
+  const [loadingIds, setLoadingIds] = useState<Set<number>>(new Set());
+  const [zoomScale, setZoomScale] = useState(1);
+  const [retryCount, setRetryCount] = useState(0);
 
   if (!diagrams || diagrams.length === 0) {
     return null;
@@ -28,87 +31,176 @@ export function DiagramViewer({ diagrams }: DiagramViewerProps) {
 
   const currentDiagram = diagrams[currentIndex];
 
-  // Render Mermaid diagram using mermaid.ink API
+  // Encode and set the mermaid.ink URL directly — let <img> handle load/error
   useEffect(() => {
-    const renderDiagram = async () => {
-      if (!currentDiagram.mermaidCode || renderedDiagrams.has(currentDiagram.id)) {
-        return;
-      }
+    const diagramId = currentDiagram.id;
+    if (!currentDiagram.mermaidCode || diagramUrls.has(diagramId) || errorIds.has(diagramId)) {
+      return;
+    }
 
-      setLoading(true);
-      try {
-        // Use mermaid.ink API for rendering
-        const encoded = btoa(currentDiagram.mermaidCode);
-        const imageUrl = `https://mermaid.ink/img/${encoded}`;
-        
-        // Preload image to check if it works
-        const img = new Image();
-        img.onload = () => {
-          setRenderedDiagrams(prev => new Map(prev).set(currentDiagram.id, imageUrl));
-          setLoading(false);
-        };
-        img.onerror = () => {
-          console.error('Failed to load diagram:', currentDiagram.title);
-          setLoading(false);
-        };
-        img.src = imageUrl;
-      } catch (error) {
-        console.error('Error rendering diagram:', error);
-        setLoading(false);
-      }
-    };
+    setLoadingIds(prev => new Set(prev).add(diagramId));
 
-    renderDiagram();
-  }, [currentDiagram, renderedDiagrams]);
+    try {
+      const encoded = btoa(unescape(encodeURIComponent(currentDiagram.mermaidCode)));
+      const imageUrl = `https://mermaid.ink/svg/${encoded}?theme=default`;
+      setDiagramUrls(prev => new Map(prev).set(diagramId, imageUrl));
+    } catch (error) {
+      console.error('Error encoding diagram:', currentDiagram.title, error);
+      setErrorIds(prev => new Set(prev).add(diagramId));
+      setLoadingIds(prev => { const next = new Set(prev); next.delete(diagramId); return next; });
+    }
+  }, [currentIndex, retryCount]); // re-run only on navigation or retry
 
   const nextDiagram = () => {
     if (currentIndex < diagrams.length - 1) {
       setCurrentIndex(prev => prev + 1);
+      setZoomScale(1);
     }
   };
 
   const prevDiagram = () => {
     if (currentIndex > 0) {
       setCurrentIndex(prev => prev - 1);
+      setZoomScale(1);
     }
   };
 
-  const renderedUrl = renderedDiagrams.get(currentDiagram.id);
+  const zoomIn = () => setZoomScale(prev => Math.min(prev + 0.25, 3));
+  const zoomOut = () => setZoomScale(prev => Math.max(prev - 0.25, 0.5));
+  const resetZoom = () => setZoomScale(1);
 
-return (
+  const handleRetry = () => {
+    const diagramId = currentDiagram.id;
+    setErrorIds(prev => { const next = new Set(prev); next.delete(diagramId); return next; });
+    setDiagramUrls(prev => { const next = new Map(prev); next.delete(diagramId); return next; });
+    setLoadingIds(prev => { const next = new Set(prev); next.delete(diagramId); return next; });
+    setRetryCount(c => c + 1);
+  };
+
+  const renderedUrl = diagramUrls.get(currentDiagram.id);
+  const isLoading = loadingIds.has(currentDiagram.id) || (!renderedUrl && !errorIds.has(currentDiagram.id) && !!currentDiagram.mermaidCode);
+  const hasError = errorIds.has(currentDiagram.id);
+
+  const DIAGRAM_TYPE_EMOJI: Record<string, string> = {
+    flowchart: '🔀',
+    sequence: '📋',
+    class: '🏗️',
+    state: '⚙️',
+    er: '🗄️',
+    gantt: '📅',
+    pie: '🥧',
+  };
+  const typeEmoji = DIAGRAM_TYPE_EMOJI[currentDiagram.type?.toLowerCase()] ?? '📊';
+
+  return (
     <div className="space-y-3 sm:space-y-4">
       {/* Diagram Display */}
-      <Card className="overflow-hidden">
+      <Card className="overflow-hidden shadow-md">
+        {/* Gradient header strip */}
+        <div className="bg-gradient-to-r from-indigo-500 via-purple-500 to-blue-500 px-4 py-3 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-xl flex-shrink-0">{typeEmoji}</span>
+            <h3 className="text-white font-semibold text-sm sm:text-base truncate">
+              {currentDiagram.title}
+            </h3>
+          </div>
+          <div className="flex items-center gap-1 flex-shrink-0">
+            {/* Zoom controls */}
+            <button
+              onClick={zoomOut}
+              disabled={zoomScale <= 0.5}
+              className="p-1.5 rounded-md bg-white/20 hover:bg-white/30 disabled:opacity-40 transition-colors"
+              title="Zoom out"
+              type="button"
+            >
+              <ZoomOut className="h-3.5 w-3.5 text-white" />
+            </button>
+            <span className="text-xs text-white/90 font-medium min-w-[36px] text-center">
+              {Math.round(zoomScale * 100)}%
+            </span>
+            <button
+              onClick={zoomIn}
+              disabled={zoomScale >= 3}
+              className="p-1.5 rounded-md bg-white/20 hover:bg-white/30 disabled:opacity-40 transition-colors"
+              title="Zoom in"
+              type="button"
+            >
+              <ZoomIn className="h-3.5 w-3.5 text-white" />
+            </button>
+            {zoomScale !== 1 && (
+              <button
+                onClick={resetZoom}
+                className="p-1.5 rounded-md bg-white/20 hover:bg-white/30 transition-colors"
+                title="Reset zoom"
+                type="button"
+              >
+                <RotateCcw className="h-3.5 w-3.5 text-white" />
+              </button>
+            )}
+            <span className="text-xs text-white/80 bg-white/20 px-2 py-0.5 rounded-full capitalize ml-1">
+              {currentDiagram.type}
+            </span>
+          </div>
+        </div>
+
         <CardContent className="p-3 sm:p-4 md:p-6">
           <div className="space-y-3 sm:space-y-4">
-            {/* Title - Mobile Optimized */}
-            <div className="flex items-center justify-between">
-              <h3 className="text-base sm:text-lg md:text-xl font-semibold">
-                {currentDiagram.title}
-              </h3>
-              <span className="text-xs sm:text-sm text-muted-foreground px-2 sm:px-3 py-1 bg-blue-50 rounded-full">
-                {currentDiagram.type}
-              </span>
-            </div>
-
-            {/* Description - Mobile Optimized */}
+            {/* Description */}
             <p className="text-xs sm:text-sm text-muted-foreground">
               {currentDiagram.description}
             </p>
 
-            {/* Diagram Image - Mobile Optimized Height */}
-            <div className="bg-white border-2 border-gray-200 rounded-lg p-2 sm:p-4 md:p-6 lg:p-8 flex items-center justify-center min-h-[200px] sm:min-h-[250px] md:min-h-[300px] lg:min-h-[400px]">
-              {loading ? (
+            {/* Diagram Image */}
+            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-indigo-100 rounded-xl overflow-auto flex items-center justify-center min-h-[200px] sm:min-h-[250px] md:min-h-[300px] lg:min-h-[400px]">
+              {isLoading ? (
                 <Loader2 className="h-8 w-8 sm:h-10 sm:w-10 md:h-12 md:w-12 animate-spin text-purple-600" />
+              ) : hasError ? (
+                <div className="text-center space-y-3 p-6">
+                  <p className="text-sm text-gray-500">Failed to render diagram</p>
+                  <button
+                    onClick={handleRetry}
+                    className="flex items-center gap-2 px-4 py-2 text-sm bg-indigo-50 text-indigo-700 rounded-lg hover:bg-indigo-100 transition-colors mx-auto"
+                    type="button"
+                  >
+                    <RefreshCw className="h-4 w-4" />
+                    Retry
+                  </button>
+                  {currentDiagram.mermaidCode && (
+                    <details className="text-left mt-2">
+                      <summary className="text-xs text-gray-400 cursor-pointer hover:text-gray-600">Show diagram code</summary>
+                      <pre className="text-xs bg-gray-50 p-3 rounded mt-2 overflow-auto max-h-40 text-left">{currentDiagram.mermaidCode}</pre>
+                    </details>
+                  )}
+                </div>
               ) : renderedUrl ? (
-                <img
-                  src={renderedUrl}
-                  alt={currentDiagram.title}
-                  className="max-w-full h-auto max-h-[250px] sm:max-h-[300px] md:max-h-[400px] lg:max-h-[500px] object-contain"
-                  onError={() => console.error('Failed to load diagram')}
-                />
+                <div
+                  style={{
+                    transform: `scale(${zoomScale})`,
+                    transformOrigin: 'top center',
+                    transition: 'transform 0.2s ease',
+                    padding: '12px',
+                  }}
+                >
+                  <img
+                    src={renderedUrl}
+                    alt={currentDiagram.title}
+                    className="max-w-full h-auto object-contain"
+                    onLoad={() => {
+                      setLoadingIds(prev => { const next = new Set(prev); next.delete(currentDiagram.id); return next; });
+                    }}
+                    onError={() => {
+                      console.error('Failed to load diagram image:', currentDiagram.title);
+                      setDiagramUrls(prev => { const next = new Map(prev); next.delete(currentDiagram.id); return next; });
+                      setErrorIds(prev => new Set(prev).add(currentDiagram.id));
+                      setLoadingIds(prev => { const next = new Set(prev); next.delete(currentDiagram.id); return next; });
+                    }}
+                  />
+                </div>
               ) : (
-                <p className="text-sm sm:text-base text-gray-500">Failed to load diagram</p>
+                <div className="text-center p-6">
+                  <Loader2 className="h-8 w-8 animate-spin text-purple-400 mx-auto mb-2" />
+                  <p className="text-xs text-gray-400">Preparing diagram…</p>
+                </div>
               )}
             </div>
           </div>
@@ -159,10 +251,10 @@ export function generateSimpleSVG(
   const height = 400;
 
   let svg = `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">`;
-  
+
   // Background
   svg += `<rect width="${width}" height="${height}" fill="#f8fafc"/>`;
-  
+
   // Draw links
   links.forEach(link => {
     const from = nodes[link.from];
@@ -171,17 +263,17 @@ export function generateSimpleSVG(
       svg += `<line x1="${from.x}" y1="${from.y}" x2="${to.x}" y2="${to.y}" stroke="#64748b" stroke-width="2" marker-end="url(#arrowhead)"/>`;
     }
   });
-  
+
   // Arrow marker
   svg += `<defs><marker id="arrowhead" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto"><polygon points="0 0, 10 3, 0 6" fill="#64748b"/></marker></defs>`;
-  
+
   // Draw nodes
   nodes.forEach((node, index) => {
     const color = index === 0 ? '#60a5fa' : '#4ade80';
     svg += `<rect x="${node.x - 60}" y="${node.y - 20}" width="120" height="40" fill="${color}" rx="8" stroke="white" stroke-width="2"/>`;
     svg += `<text x="${node.x}" y="${node.y + 5}" text-anchor="middle" fill="white" font-size="14" font-weight="bold">${node.label}</text>`;
   });
-  
+
   svg += '</svg>';
   return svg;
 }

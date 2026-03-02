@@ -9,9 +9,10 @@
 // ============================================================
 
 import { useState, useEffect, useCallback } from 'react';
-import { ChevronLeft, ChevronRight, Shuffle, RotateCcw, CheckCircle2, XCircle, Target } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Shuffle, RotateCcw, CheckCircle2, XCircle, Target, RefreshCw, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { UpgradeBanner } from '@/components/features/UpgradeBanner';
 
 interface Flashcard {
   id: number;
@@ -31,11 +32,22 @@ interface FlashcardDeck {
 interface FlashcardViewerProps {
   deck: FlashcardDeck;
   deckId?: string; // used as localStorage key; falls back to topic slug
+  isOwner?: boolean;
+  queryId?: string;
+  setNumber?: number;
+  totalSets?: number;
 }
 
 type MasteryMap = Record<number, 'known' | 'review'>;
 
-export function FlashcardViewer({ deck, deckId }: FlashcardViewerProps) {
+export function FlashcardViewer({
+  deck,
+  deckId,
+  isOwner = false,
+  queryId,
+  setNumber = 1,
+  totalSets = 1,
+}: FlashcardViewerProps) {
   const storageKey = `flashcard-mastery-${deckId ?? deck.topic.toLowerCase().replace(/\s+/g, '-')}`;
 
   const [cards, setCards] = useState<Flashcard[]>(deck.cards);
@@ -44,6 +56,8 @@ export function FlashcardViewer({ deck, deckId }: FlashcardViewerProps) {
   const [mastery, setMastery] = useState<MasteryMap>({});
   const [reviewOnly, setReviewOnly] = useState(false);
   const [sessionComplete, setSessionComplete] = useState(false);
+  const [regenerating, setRegenerating] = useState(false);
+  const [regenError, setRegenError] = useState('');
 
   // Load saved mastery from localStorage on mount
   useEffect(() => {
@@ -124,6 +138,34 @@ export function FlashcardViewer({ deck, deckId }: FlashcardViewerProps) {
     reset();
   };
 
+  const handleRegenerate = async () => {
+    if (!queryId || !isOwner) return;
+    setRegenerating(true);
+    setRegenError('');
+    try {
+      const res = await fetch('/api/content/flashcards', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ queryId, cardCount: 15, regenerate: true }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        if (res.status === 403) {
+          setRegenError(data.error || 'Upgrade to Pro to generate more flashcard sets.');
+        } else {
+          setRegenError(data.error || 'Failed to generate new flashcards');
+        }
+        return;
+      }
+      // Reload the page to show the new set
+      window.location.reload();
+    } catch {
+      setRegenError('Failed to generate new flashcards');
+    } finally {
+      setRegenerating(false);
+    }
+  };
+
   const difficultyColors: Record<string, string> = {
     easy: 'bg-green-500',
     medium: 'bg-yellow-500',
@@ -168,7 +210,25 @@ export function FlashcardViewer({ deck, deckId }: FlashcardViewerProps) {
           <Button variant="ghost" onClick={resetMastery} className="text-gray-400 text-xs">
             Reset mastery
           </Button>
+          {isOwner && queryId && (
+            <Button
+              onClick={handleRegenerate}
+              disabled={regenerating}
+              className="bg-gradient-to-r from-indigo-500 to-blue-600 hover:from-indigo-600 hover:to-blue-700 text-white"
+            >
+              {regenerating ? (
+                <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Generating...</>
+              ) : (
+                <><RefreshCw className="h-4 w-4 mr-1" /> New Set (Pro)</>
+              )}
+            </Button>
+          )}
         </div>
+        {regenError && (
+          <div className="mt-4 max-w-sm mx-auto">
+            <UpgradeBanner message={regenError} />
+          </div>
+        )}
       </div>
     );
   }
@@ -206,8 +266,26 @@ export function FlashcardViewer({ deck, deckId }: FlashcardViewerProps) {
             <RotateCcw className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
             <span className="hidden sm:inline">Reset</span>
           </Button>
+          {isOwner && queryId && (
+            <Button
+              size="sm"
+              onClick={handleRegenerate}
+              disabled={regenerating}
+              className="text-xs bg-gradient-to-r from-indigo-500 to-blue-600 text-white hover:from-indigo-600 hover:to-blue-700"
+              title="Generate a new set of flashcards (Pro)"
+            >
+              {regenerating ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : (
+                <><RefreshCw className="h-3 w-3 mr-1" /><span className="hidden sm:inline">New Set</span></>
+              )}
+            </Button>
+          )}
         </div>
       </div>
+
+      {/* Upgrade banner */}
+      {regenError && <UpgradeBanner message={regenError} />}
 
       {/* Mastery bar */}
       <div>
@@ -316,7 +394,7 @@ export function FlashcardViewer({ deck, deckId }: FlashcardViewerProps) {
           disabled={currentIndex === 0}
           variant="outline"
           size="sm"
-          className="flex-1 sm:flex-none text-xs sm:text-sm h-9 sm:h-10"
+          className="min-w-[80px] text-xs sm:text-sm h-9 sm:h-10"
         >
           <ChevronLeft className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
           Prev
@@ -333,7 +411,7 @@ export function FlashcardViewer({ deck, deckId }: FlashcardViewerProps) {
           disabled={currentIndex === activeCards.length - 1 && !isFlipped}
           variant="outline"
           size="sm"
-          className="flex-1 sm:flex-none text-xs sm:text-sm h-9 sm:h-10"
+          className="min-w-[80px] text-xs sm:text-sm h-9 sm:h-10"
         >
           Next
           <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4 ml-1" />

@@ -27,6 +27,8 @@ export async function GET() {
         plan: true,
         createdAt: true,
         emailVerified: true,
+        phone: true,
+        phoneVerified: true,
         password: true, // used only to derive hasPassword — never sent raw
         _count: {
           select: {
@@ -47,6 +49,7 @@ export async function GET() {
     return NextResponse.json({
       ...userWithoutPassword,
       hasPassword: !!password,
+      phoneVerified: user.phoneVerified ? user.phoneVerified.toISOString() : null,
     });
   } catch (error) {
     console.error('Profile fetch error:', error);

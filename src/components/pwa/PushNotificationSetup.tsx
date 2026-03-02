@@ -83,25 +83,29 @@ export function PushNotificationSetup() {
   };
 
   return (
-    <div className="flex items-center gap-3">
-      <Button
-        onClick={enabled ? unsubscribe : subscribe}
-        disabled={loading}
-        variant={enabled ? 'outline' : 'default'}
-        size="sm"
-      >
-        {enabled ? (
-          <>
-            <BellOff className="w-4 h-4 mr-2" />
-            Disable Notifications
-          </>
-        ) : (
-          <>
-            <Bell className="w-4 h-4 mr-2" />
-            Enable Notifications
-          </>
-        )}
-      </Button>
-    </div>
+    <Button
+      onClick={enabled ? unsubscribe : subscribe}
+      disabled={loading}
+      variant={enabled ? 'outline' : 'default'}
+      size="sm"
+      className="text-xs h-8 px-3 w-full sm:w-auto"
+    >
+      {loading ? (
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+          {enabled ? 'Disabling…' : 'Enabling…'}
+        </span>
+      ) : enabled ? (
+        <span className="flex items-center gap-1.5">
+          <BellOff className="w-3.5 h-3.5" />
+          Disable
+        </span>
+      ) : (
+        <span className="flex items-center gap-1.5">
+          <Bell className="w-3.5 h-3.5" />
+          Enable
+        </span>
+      )}
+    </Button>
   );
 }

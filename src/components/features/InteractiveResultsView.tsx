@@ -49,6 +49,10 @@ interface InteractiveResultsViewProps {
   conceptMapData: any;
   articleText: string;
   queryId: string;
+  /** When false, "Generate X" buttons are hidden (non-owner group/challenge access) */
+  isOwner?: boolean;
+  /** When set, quiz submits challenge score to /api/challenge/submit-score */
+  challengeId?: string;
 }
 
 type CardSize = 'normal' | 'minimized' | 'maximized';
@@ -69,6 +73,8 @@ export function InteractiveResultsView({
   conceptMapData,
   articleText,
   queryId,
+  isOwner = true,
+  challengeId,
 }: InteractiveResultsViewProps) {
   
   // Card size states
@@ -83,8 +89,17 @@ export function InteractiveResultsView({
   const quizSets = query.content.filter(
       (c: { contentType: string }) => c.contentType === "quiz"
     );
-
   const latestQuiz = quizSets[quizSets.length - 1]; // use the most recent
+
+  // Flashcard sets tracking (parity with quizSets)
+  const flashcardSets = query.content.filter(
+    (c: { contentType: string }) => c.contentType === 'flashcards'
+  );
+  const latestFlashcard = flashcardSets[flashcardSets.length - 1];
+  const currentFlashcardData = (latestFlashcard?.data as any) ?? flashcardData;
+  const currentDeck = currentFlashcardData?.deck ?? flashcardData?.deck;
+  const currentDeckId = latestFlashcard?.id ?? flashcardData?.deckId;
+  const flashcardSetNumber = (latestFlashcard as any)?.setNumber ?? 1;
 
   // Download PDF function
   const handleDownloadPDF = () => {
@@ -198,8 +213,9 @@ export function InteractiveResultsView({
       {/* LEFT COLUMN (Desktop) / TOP SECTION (Mobile) - Article Content */}
       <div className={`flex flex-col gap-6 ${presentationSize === 'maximized' || flashcardsSize === 'maximized' || quizSize === 'maximized' ? 'lg:col-span-2' : ''}`}>
       {/* LEFT COLUMN */}
-         <Card className="w-full">
-          <CardHeader className="pb-3 px-4">
+         <Card className="w-full overflow-hidden">
+          <div className="h-1.5 bg-gradient-to-r from-blue-500 to-indigo-600" />
+          <CardHeader className="pb-3 px-4 bg-blue-50/60">
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center gap-2 text-base">
                 <BookOpen className="h-5 w-5 text-blue-600" />
@@ -255,8 +271,9 @@ export function InteractiveResultsView({
         </Card>
 
         {/* Presentation */}
-        <Card className="w-full">
-          <CardHeader className="pb-3 px-4">
+        <Card className="w-full overflow-hidden">
+          <div className="h-1.5 bg-gradient-to-r from-orange-500 to-red-500" />
+          <CardHeader className="pb-3 px-4 bg-orange-50/60">
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center gap-2 text-base">
                 <Presentation className="h-5 w-5 text-red-600" />
@@ -293,15 +310,19 @@ export function InteractiveResultsView({
           {presentationSize !== 'minimized' && (
             <CardContent>
               {hasPresentationData ? (
-                <PresentationViewer 
+                <PresentationViewer
                   presentationData={presentationData.presentation}
                   autoPlay={false}
                 />
               ) : (
-                <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed">
-                  <Presentation className="h-16 w-16 mx-auto mb-4 text-gray-400" />
+                <div className="text-center py-10 bg-gradient-to-br from-orange-50 to-red-50 border border-orange-100 rounded-xl">
+                  <Presentation className="h-14 w-14 mx-auto mb-4 text-orange-400" />
                   <p className="text-gray-600 mb-6">Generate presentation slides</p>
-                  <GeneratePresentationButton queryId={queryId} />
+                  {isOwner ? (
+                    <GeneratePresentationButton queryId={queryId} />
+                  ) : (
+                    <p className="text-xs text-gray-400 italic">Only the content owner can generate materials</p>
+                  )}
                 </div>
               )}
             </CardContent>
@@ -309,8 +330,9 @@ export function InteractiveResultsView({
         </Card>
 
         {/* Visual Diagrams */}
-        <Card className="w-full">
-          <CardHeader className="pb-3 px-4">
+        <Card className="w-full overflow-hidden">
+          <div className="h-1.5 bg-gradient-to-r from-emerald-500 to-teal-600" />
+          <CardHeader className="pb-3 px-4 bg-emerald-50/60">
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center gap-2 text-base">
                 <BarChart3 className="h-5 w-5 text-green-600" />
@@ -349,10 +371,14 @@ export function InteractiveResultsView({
               {hasDiagrams ? (
                 <DiagramViewer diagrams={diagramData.diagrams} />
               ) : (
-                <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed">
-                  <BarChart3 className="h-16 w-16 mx-auto mb-4 text-gray-400" />
+                <div className="text-center py-10 bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-100 rounded-xl">
+                  <BarChart3 className="h-14 w-14 mx-auto mb-4 text-emerald-400" />
                   <p className="text-gray-600 mb-6">Generate visual diagrams</p>
-                  <GenerateDiagramsButton queryId={queryId} />
+                  {isOwner ? (
+                    <GenerateDiagramsButton queryId={queryId} />
+                  ) : (
+                    <p className="text-xs text-gray-400 italic">Only the content owner can generate materials</p>
+                  )}
                 </div>
               )}
             </CardContent>
@@ -361,8 +387,9 @@ export function InteractiveResultsView({
 
         {/* Concept Map */}
         {conceptMapData && (
-           <Card className="w-full">          
-            <CardHeader className="pb-3 px-4">
+           <Card className="w-full overflow-hidden">
+            <div className="h-1.5 bg-gradient-to-r from-amber-500 to-orange-500" />
+            <CardHeader className="pb-3 px-4 bg-amber-50/60">
               <div className="flex items-center justify-between">
                 <CardTitle className="flex items-center gap-2 text-base">
                   <Network className="h-5 w-5 text-orange-600" />
@@ -399,7 +426,7 @@ export function InteractiveResultsView({
             {conceptMapSize !== 'minimized' && (
              <CardContent>
                 {conceptMapData ? (
-                  <EnhancedConceptMap 
+                  <EnhancedConceptMap
                     data={conceptMapData}
                     articleText={articleText}
                   />
@@ -407,7 +434,11 @@ export function InteractiveResultsView({
                   <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed">
                     <Network className="h-16 w-16 mx-auto mb-4 text-gray-400" />
                     <p className="text-gray-600 mb-6">Generate an interactive concept map</p>
-                    <GenerateConceptMapButton queryId={queryId} />
+                    {isOwner ? (
+                      <GenerateConceptMapButton queryId={queryId} />
+                    ) : (
+                      <p className="text-xs text-gray-400 italic">Only the content owner can generate materials</p>
+                    )}
                   </div>
                 )}
               </CardContent>
@@ -419,8 +450,9 @@ export function InteractiveResultsView({
       {/* RIGHT COLUMN */}
       <div className={`flex flex-col gap-6 ${presentationSize === 'maximized' || flashcardsSize === 'maximized' || quizSize === 'maximized' ? 'lg:col-span-2' : ''}`}>
         {/* Audio Player */}
-        <Card className="w-full">
-          <CardHeader className="pb-3 px-4">
+        <Card className="w-full overflow-hidden">
+          <div className="h-1.5 bg-gradient-to-r from-purple-500 to-violet-600" />
+          <CardHeader className="pb-3 px-4 bg-purple-50/60">
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center gap-2 text-base">
                 <Headphones className="h-5 w-5 text-purple-600" />
@@ -469,10 +501,14 @@ export function InteractiveResultsView({
               {hasAudioContent ? (
                 <AudioPlayerSection audioContent={audioContent} queryId={queryId} />
               ) : (
-                <div className="text-center py-8 bg-gray-50 rounded-lg border-2 border-dashed">
-                  <Volume2 className="h-12 w-12 mx-auto mb-3 text-gray-400" />
+                <div className="text-center py-8 bg-gradient-to-br from-purple-50 to-violet-50 border border-purple-100 rounded-xl">
+                  <Volume2 className="h-12 w-12 mx-auto mb-3 text-purple-400" />
                   <p className="text-gray-600 mb-4 text-sm">Audio narration not available</p>
-                  <GenerateAudioButton queryId={queryId} />
+                  {isOwner ? (
+                    <GenerateAudioButton queryId={queryId} />
+                  ) : (
+                    <p className="text-xs text-gray-400 italic">Only the content owner can generate materials</p>
+                  )}
                 </div>
               )}
             </CardContent>
@@ -480,8 +516,9 @@ export function InteractiveResultsView({
         </Card>
 
         {/* Quiz <Card className={`${getCardClass(quizSize)} transition-all`}>*/}
-        <Card id="quiz-section" className="w-full">
-          <CardHeader className="pb-3 px-4">
+        <Card id="quiz-section" className="w-full overflow-hidden">
+          <div className="h-1.5 bg-gradient-to-r from-pink-500 to-rose-600" />
+          <CardHeader className="pb-3 px-4 bg-pink-50/60">
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center gap-2 text-base">
                 <Brain className="h-5 w-5 text-pink-600" />
@@ -518,12 +555,22 @@ export function InteractiveResultsView({
           {quizSize !== 'minimized' && (
             <CardContent>
               {hasQuiz && quiz ? (
-                <PracticeQuizViewer quiz={quiz} queryId={query.id} totalSets={quizSets.length}/>
+                <PracticeQuizViewer
+                  quiz={quiz}
+                  queryId={query.id}
+                  totalSets={quizSets.length}
+                  isOwner={isOwner}
+                  challengeId={challengeId}
+                />
               ) : (
-                <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed">
-                  <Brain className="h-16 w-16 mx-auto mb-4 text-gray-400" />
+                <div className="text-center py-10 bg-gradient-to-br from-pink-50 to-rose-50 border border-pink-100 rounded-xl">
+                  <Brain className="h-14 w-14 mx-auto mb-4 text-pink-400" />
                   <p className="text-gray-600 mb-6">Test your knowledge with a practice quiz</p>
-                  <GenerateQuizButton queryId={queryId} />
+                  {isOwner ? (
+                    <GenerateQuizButton queryId={queryId} />
+                  ) : (
+                    <p className="text-xs text-gray-400 italic">Only the content owner can generate materials</p>
+                  )}
                 </div>
               )}
             </CardContent>
@@ -531,12 +578,13 @@ export function InteractiveResultsView({
         </Card>
 
         {/* Flashcards className={`${getCardClass(flashcardsSize)} transition-all`}*/}
-        <Card className='w-full'>
-          <CardHeader className="pb-3 px-4">
+        <Card className='w-full overflow-hidden'>
+          <div className="h-1.5 bg-gradient-to-r from-indigo-500 to-blue-600" />
+          <CardHeader className="pb-3 px-4 bg-indigo-50/60">
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center gap-2 text-base">
                 <Layers className="h-5 w-5 text-indigo-600" />
-                Flashcards
+                Flashcards {flashcardSets.length > 1 && <span className="text-xs font-normal text-indigo-500 ml-1">Set {flashcardSetNumber}</span>}
               </CardTitle>
               <div className="flex items-center gap-1">
                 <button
@@ -568,13 +616,24 @@ export function InteractiveResultsView({
           </CardHeader>
           {flashcardsSize !== 'minimized' && (
             <CardContent>
-              {hasFlashcards ? (
-                <FlashcardViewer deck={flashcardData.deck} deckId={flashcardData.deckId} />
+              {hasFlashcards && currentDeck ? (
+                <FlashcardViewer
+                  deck={currentDeck}
+                  deckId={currentDeckId}
+                  isOwner={isOwner}
+                  queryId={queryId}
+                  setNumber={flashcardSetNumber}
+                  totalSets={flashcardSets.length}
+                />
               ) : (
-                <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed">
-                  <Layers className="h-16 w-16 mx-auto mb-4 text-gray-400" />
+                <div className="text-center py-10 bg-gradient-to-br from-indigo-50 to-blue-50 border border-indigo-100 rounded-xl">
+                  <Layers className="h-14 w-14 mx-auto mb-4 text-indigo-400" />
                   <p className="text-gray-600 mb-6">Generate flashcards</p>
-                  <GenerateFlashcardsButton queryId={queryId} />
+                  {isOwner ? (
+                    <GenerateFlashcardsButton queryId={queryId} />
+                  ) : (
+                    <p className="text-xs text-gray-400 italic">Only the content owner can generate materials</p>
+                  )}
                 </div>
               )}
             </CardContent>

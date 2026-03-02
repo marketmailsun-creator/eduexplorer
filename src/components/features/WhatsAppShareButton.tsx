@@ -48,8 +48,7 @@ export function WhatsAppShareButton({ topic, summary, queryId }: WhatsAppShareBu
     <>
       <button
         onClick={() => setOpen(true)}
-        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#25D366] hover:bg-[#20bd5a] 
-                   text-white text-sm font-semibold transition-colors shadow-sm"
+        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#25D366] hover:bg-[#20bd5a] text-white text-sm font-medium transition-colors"
         title="Share on WhatsApp"
       >
         <MessageCircle className="h-4 w-4" />

@@ -42,21 +42,10 @@ const CATEGORIES = [
   },
 ];
 
-const TRENDING = [
-  'Artificial Intelligence',
-  'Climate Change',
-  'Quantum Computing',
-  'UPSC Preparation',
-  'JEE Chemistry',
-  'Personal Finance India',
-  'Web Development',
-  'Human Psychology',
-  'Space Exploration',
-];
-
 export function TopicDiscoveryHub() {
   const router = useRouter();
   const [recentTopics, setRecentTopics] = useState<string[]>([]);
+  const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
 
   useEffect(() => {
     fetch('/api/query/history')
@@ -83,26 +72,6 @@ export function TopicDiscoveryHub() {
 
   return (
     <div className="w-full mb-8 space-y-6">
-      {/* Trending topics */}
-      <div>
-        <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
-          🔥 Trending Topics
-        </h2>
-        <div className="flex flex-wrap gap-2">
-          {TRENDING.map(topic => (
-            <button
-              key={topic}
-              onClick={() => navigate(topic)}
-              className="px-3 py-1.5 text-sm bg-white border border-gray-200 rounded-full
-                         hover:border-purple-400 hover:text-purple-700 hover:bg-purple-50
-                         transition-colors text-gray-700 shadow-sm"
-            >
-              {topic}
-            </button>
-          ))}
-        </div>
-      </div>
-
       {/* Recent for this user */}
       {recentTopics.length > 0 && (
         <div>
@@ -114,8 +83,9 @@ export function TopicDiscoveryHub() {
               <button
                 key={topic}
                 onClick={() => navigate(topic)}
-                className="px-3 py-1.5 text-sm bg-indigo-50 border border-indigo-200 rounded-full
-                           hover:bg-indigo-100 hover:border-indigo-400 text-indigo-700
+                className="px-3 py-1.5 text-sm font-medium bg-gradient-to-r from-purple-50 to-indigo-50
+                           border border-purple-200 rounded-full text-purple-700
+                           hover:from-purple-100 hover:to-indigo-100 hover:border-purple-400
                            transition-colors shadow-sm"
               >
                 {topic}
@@ -130,7 +100,46 @@ export function TopicDiscoveryHub() {
         <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
           🗂️ Browse by Subject
         </h2>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+
+        {/* Mobile: horizontal scrollable chip strip */}
+        <div className="md:hidden">
+          <div className="flex gap-2 overflow-x-auto pb-2" style={{ scrollbarWidth: 'none' }}>
+            {CATEGORIES.map(cat => (
+              <button
+                key={cat.label}
+                onClick={() => setExpandedCategory(expandedCategory === cat.label ? null : cat.label)}
+                className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-full border text-sm font-medium transition-colors ${
+                  expandedCategory === cat.label
+                    ? 'bg-purple-100 border-purple-300 text-purple-700'
+                    : 'bg-white border-gray-200 text-gray-700 hover:border-purple-300 hover:bg-purple-50'
+                }`}
+              >
+                <span>{cat.emoji}</span>
+                <span>{cat.label}</span>
+              </button>
+            ))}
+          </div>
+          {/* Expanded topics for selected category */}
+          {expandedCategory && (() => {
+            const cat = CATEGORIES.find(c => c.label === expandedCategory);
+            return cat ? (
+              <div className="flex flex-wrap gap-2 mt-3">
+                {cat.topics.slice(0, 3).map(t => (
+                  <button
+                    key={t}
+                    onClick={() => navigate(t)}
+                    className="px-3 py-1.5 text-xs bg-indigo-50 border border-indigo-200 rounded-full text-indigo-700 hover:bg-indigo-100 transition-colors"
+                  >
+                    {t}
+                  </button>
+                ))}
+              </div>
+            ) : null;
+          })()}
+        </div>
+
+        {/* Desktop: full 6-column grid */}
+        <div className="hidden md:grid md:grid-cols-3 lg:grid-cols-6 gap-3">
           {CATEGORIES.map(cat => (
             <div
               key={cat.label}

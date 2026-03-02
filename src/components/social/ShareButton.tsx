@@ -99,54 +99,6 @@ export default function ShareButton({ queryId, contentId, title }: ShareButtonPr
       });
       return;
     }
-    const showToast = (title: string, description?: string, variant: 'default' | 'destructive' = 'default') => {
-      const toastEl = document.createElement('div');
-      toastEl.className = `fixed bottom-4 right-4 z-[9999] p-4 rounded-lg shadow-lg ${
-        variant === 'destructive' ? 'bg-red-500' : 'bg-green-500'
-      } text-white max-w-md`;
-      
-      toastEl.style.animation = 'slideInFromBottom 0.3s ease-out';
-      
-      toastEl.innerHTML = `
-        <div class="font-semibold">${title}</div>
-        ${description ? `<div class="text-sm mt-1 opacity-90">${description}</div>` : ''}
-      `;
-      
-      document.body.appendChild(toastEl);
-      
-      setTimeout(() => {
-        toastEl.style.animation = 'slideOutToBottom 0.3s ease-in';
-        setTimeout(() => toastEl.remove(), 300);
-      }, 3000);
-    };
-
-    // Add CSS animations
-    if (typeof document !== 'undefined') {
-      const style = document.createElement('style');
-      style.textContent = `
-        @keyframes slideInFromBottom {
-          from {
-            transform: translateY(100%);
-            opacity: 0;
-          }
-          to {
-            transform: translateY(0);
-            opacity: 1;
-          }
-        }
-        @keyframes slideOutToBottom {
-          from {
-            transform: translateY(0);
-            opacity: 1;
-          }
-          to {
-            transform: translateY(100%);
-            opacity: 0;
-          }
-        }
-      `;
-      document.head.appendChild(style);
-    }
     setSharingToGroups(true);
     try {
       const response = await fetch('/api/share/sel-groups', {
@@ -164,31 +116,23 @@ export default function ShareButton({ queryId, contentId, title }: ShareButtonPr
         throw new Error(data.error || 'Failed to share to groups');
       }
 
-      // ✨ Handle different scenarios
+      // Handle different scenarios
       if (data.sharedCount === 0) {
-      showToast(
-        'Already Shared',
-        `Content is already shared with the selected group${selectedGroups.length > 1 ? 's' : ''}`
-      );
-    } else if (data.sharedCount < data.totalGroups) {
-      showToast(
-        'Partially Shared',
-        `Shared to ${data.sharedCount} new group${data.sharedCount > 1 ? 's' : ''}. Already shared with ${data.totalGroups - data.sharedCount}.`
-      );
-    } else {
-      showToast(
-        'Shared Successfully!',
-        `Content shared to ${data.sharedCount} group${data.sharedCount > 1 ? 's' : ''}`
-      );
-    }
-
-      // toast({
-      //   title: 'Shared successfully!',
-      //   description: `Shared to ${selectedGroups.length} group${selectedGroups.length > 1 ? 's' : ''}`,
-      // });
-
-      // Also create public link for sharing
-      //await handleCreatePublicLink();
+        toast({
+          title: 'Already Shared',
+          description: `Content is already shared with the selected group${selectedGroups.length > 1 ? 's' : ''}`,
+        });
+      } else if (data.sharedCount < data.totalGroups) {
+        toast({
+          title: 'Partially Shared',
+          description: `Shared to ${data.sharedCount} new group${data.sharedCount > 1 ? 's' : ''}. Already shared with ${data.totalGroups - data.sharedCount}.`,
+        });
+      } else {
+        toast({
+          title: 'Shared Successfully!',
+          description: `Content shared to ${data.sharedCount} group${data.sharedCount > 1 ? 's' : ''}`,
+        });
+      }
       
       setOpen(false);
       setSelectedGroups([]);
@@ -241,10 +185,10 @@ export default function ShareButton({ queryId, contentId, title }: ShareButtonPr
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm">
-          <Share2 className="h-4 w-4 mr-2" />
-          Share
-        </Button>
+        <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-purple-300 text-purple-600 bg-white hover:bg-purple-50 text-sm font-medium transition-colors">
+          <Share2 className="h-4 w-4" />
+          <span>Share</span>
+        </button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
@@ -372,12 +316,7 @@ export default function ShareButton({ queryId, contentId, title }: ShareButtonPr
                   <Button
                     onClick={handleShareToGroups}
                     disabled={selectedGroups.length === 0 || sharingToGroups}
-                    className={`
-                        inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold
-                        border-2 transition-all duration-200 select-none focus:outline-none
-                        active:scale-95 disabled:opacity-60
-                        
-                      `}
+                    className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-purple-600 text-white font-semibold text-sm hover:bg-purple-700 transition-colors disabled:opacity-50"
                   >
                     {sharingToGroups
                       ? 'Sharing...'

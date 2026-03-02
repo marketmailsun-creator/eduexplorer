@@ -170,7 +170,7 @@ export default function UpgradePage() {
               Pro Monthly
             </CardTitle>
             <div className="mt-3">
-              <span className="text-3xl font-bold">₹600</span>
+              <span className="text-3xl font-bold">₹499</span>
               <span className="text-gray-600">/month</span>
             </div>
           </CardHeader>
@@ -209,7 +209,7 @@ export default function UpgradePage() {
         {/* Yearly Plan */}
         <Card className="relative">
           <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-green-600 text-white px-4 py-1 rounded-full text-sm font-semibold whitespace-nowrap">
-            SAVE ₹1,200
+            SAVE ₹989
           </div>
 
           <CardHeader>
@@ -218,9 +218,9 @@ export default function UpgradePage() {
               Pro Yearly
             </CardTitle>
             <div className="mt-3">
-              <span className="text-3xl font-bold">₹6,000</span>
+              <span className="text-3xl font-bold">₹4,999</span>
               <span className="text-gray-600">/year</span>
-              <div className="text-sm text-green-600 font-medium mt-1">= ₹500/month</div>
+              <div className="text-sm text-green-600 font-medium mt-1">= ₹416/month</div>
             </div>
           </CardHeader>
           <CardContent>
