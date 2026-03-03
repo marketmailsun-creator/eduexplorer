@@ -18,7 +18,7 @@ const genAI = GOOGLE_API_KEY ? new GoogleGenerativeAI(GOOGLE_API_KEY) : null;
 export interface PracticeQuestion {
   id: number;
   question: string;
-  type: 'multiple-choice' | 'true-false' | 'short-answer' | 'fill-blank';
+  type: 'multiple-choice' | 'true-false';
   difficulty: 'easy' | 'medium' | 'hard';
   options?: string[];
   correctAnswer: string;
@@ -72,12 +72,10 @@ export async function generateTopicQuiz(
 This set should focus specifically on: ${focusArea}
 ${prevBlock}
 Generate exactly ${count} fresh questions. Mix these types:
-- multiple-choice (4 options, 1 correct) — 50%
-- true-false — 20%
-- fill-blank — 20%
-- short-answer — 10%
+- multiple-choice (4 options, 1 correct) — 70%
+- true-false — 30%
 
-Difficulty mix: 30% easy, 50% medium, 20% hard
+Difficulty mix: 10% easy, 70% medium, 20% hard
 
 Rules:
 1. Questions must test UNDERSTANDING, not just recall
@@ -141,16 +139,16 @@ function generateFallbackTopicQuestions(
 ): PracticeQuiz {
   const questions: PracticeQuestion[] = [];
   const baseTemplates = [
-    { q: `What is the primary purpose of ${topic}?`, type: 'short-answer' as const, diff: 'easy' as const, cat: 'definition' },
-    { q: `Which of the following best describes ${topic}?`, type: 'multiple-choice' as const, diff: 'easy' as const, cat: 'concept' },
-    { q: `${topic} was developed primarily to solve real-world problems.`, type: 'true-false' as const, diff: 'easy' as const, cat: 'fact' },
-    { q: `What are the key components that make up ${topic}?`, type: 'short-answer' as const, diff: 'medium' as const, cat: 'concept' },
-    { q: `How does ${topic} differ from related approaches?`, type: 'short-answer' as const, diff: 'medium' as const, cat: 'comparison' },
-    { q: `The main limitation of ${topic} is ___.`, type: 'fill-blank' as const, diff: 'medium' as const, cat: 'application' },
-    { q: `In practice, ${topic} is most commonly used for ___.`, type: 'fill-blank' as const, diff: 'medium' as const, cat: 'application' },
+   // { q: `What is the primary purpose of ${topic}?`, type: 'short-answer' as const, diff: 'easy' as const, cat: 'definition' },
+    { q: `Which of the following best describes ${topic}?`, type: 'multiple-choice' as const, diff: 'hard' as const, cat: 'concept' },
+    { q: `${topic} was developed primarily to solve real-world problems.`, type: 'true-false' as const, diff: 'hard' as const, cat: 'fact' },
+   // { q: `What are the key components that make up ${topic}?`, type: 'short-answer' as const, diff: 'medium' as const, cat: 'concept' },
+    //{ q: `How does ${topic} differ from related approaches?`, type: 'short-answer' as const, diff: 'medium' as const, cat: 'comparison' },
+    //{ q: `The main limitation of ${topic} is ___.`, type: 'fill-blank' as const, diff: 'medium' as const, cat: 'application' },
+    //{ q: `In practice, ${topic} is most commonly used for ___.`, type: 'fill-blank' as const, diff: 'medium' as const, cat: 'application' },
     { q: `${topic} requires specialized knowledge to implement correctly.`, type: 'true-false' as const, diff: 'medium' as const, cat: 'fact' },
-    { q: `What would happen if the core principle of ${topic} were removed?`, type: 'short-answer' as const, diff: 'hard' as const, cat: 'analysis' },
-    { q: `How has ${topic} evolved over time?`, type: 'short-answer' as const, diff: 'hard' as const, cat: 'history' },
+    //{ q: `What would happen if the core principle of ${topic} were removed?`, type: 'short-answer' as const, diff: 'hard' as const, cat: 'analysis' },
+    //{ q: `How has ${topic} evolved over time?`, type: 'short-answer' as const, diff: 'hard' as const, cat: 'history' },
   ];
 
   const templateOffset = (setNumber - 1) * 3;

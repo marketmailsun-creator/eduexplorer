@@ -3,9 +3,7 @@ import { auth } from '@/auth';
 import { generateSpeech } from '@/lib/api/elevenlabs';
 import { prisma } from '@/lib/db/prisma';
 import { canGenerateContent, canGenerateAudioOnDemand } from '@/lib/services/plan-limits.service';
-import { writeFile, mkdir } from 'fs/promises';
-import { join } from 'path';
-import { existsSync } from 'fs';
+import { generateAudioSummary } from '@/lib/services/audio-summarizer';
 import { z } from 'zod';
 import { uploadAudio } from '@/lib/storage/r2';
 
@@ -81,15 +79,22 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No text content to convert' }, { status: 400 });
     }
 
-    // ✅ Limit text length for free users (save on API costs)
-    const maxLength = hasOnDemandAccess ? 10000 : 5000; // Pro: 10k chars, Free: 5k chars
-    const truncatedText = text.length > maxLength ? text.substring(0, maxLength) + '...' : text;
+    // Get learning level from the associated query
+    const learningLevel = (content.query as any).complexityLevel || 'college';
+    const maxDurationMinutes = hasOnDemandAccess ? 10 : 5; // Pro: 10 min, Free: 5 min
 
-    // Generate audio
-    console.log(`🎵 Generating audio for user ${session.user.id} (${hasOnDemandAccess ? 'PRO' : 'FREE'})`);
-    
+    // Generate AI-optimized audio script using Claude instead of raw article text
+    console.log(`🤖 Generating AI audio script for user ${session.user.id} (${hasOnDemandAccess ? 'PRO' : 'FREE'}, ${maxDurationMinutes}min target)...`);
+    const audioScript = await generateAudioSummary({
+      text,
+      maxDurationMinutes,
+      learningLevel,
+    });
+
+    // Generate audio from the AI script
+    console.log(`🎵 Converting AI script to speech (${audioScript.split(/\s+/).length} words)...`);
     const audioBuffer = await generateSpeech({
-      text: truncatedText,
+      text: audioScript,
       voiceId: '21m00Tcm4TlvDq8ikWAM',
     });
 
@@ -116,10 +121,11 @@ export async function POST(req: NextRequest) {
         contentType: 'audio',
         title: `${content.title} - Audio`,
         storageUrl: publicUrl,
-        data: { 
-          duration: 0, 
+        data: {
+          duration: 0,
           originalContentId: contentId,
-          truncated: text.length > maxLength,
+          aiSummarized: true,
+          wordCount: audioScript.split(/\s+/).length,
         },
       },
     });
@@ -130,7 +136,6 @@ export async function POST(req: NextRequest) {
       success: true,
       audioUrl: publicUrl,
       audioContent,
-      truncated: text.length > maxLength,
     });
   } catch (error) {
     if (error instanceof z.ZodError) {

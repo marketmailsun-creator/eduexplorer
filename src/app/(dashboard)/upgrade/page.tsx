@@ -2,9 +2,12 @@
 
 import { useState } from 'react';
 import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Check, Crown, Loader2, Zap } from 'lucide-react';
+import { Check, Crown, Loader2, Zap, Info } from 'lucide-react';
+import Link from 'next/link';
 
 declare global {
   interface Window {
@@ -14,7 +17,15 @@ declare global {
 
 export default function UpgradePage() {
   const { data: session } = useSession();
+  const router = useRouter();
   const [loading, setLoading] = useState<'monthly' | 'yearly' | null>(null);
+
+  // Redirect pro users to profile — they're already subscribed
+  useEffect(() => {
+    if (session?.user?.plan === 'pro') {
+      router.replace('/profile');
+    }
+  }, [session, router]);
 
   const loadRazorpayScript = () => {
     return new Promise((resolve) => {
@@ -266,6 +277,22 @@ export default function UpgradePage() {
           <div className="px-4 py-2 bg-gray-100 rounded-lg text-sm">📱 UPI</div>
           <div className="px-4 py-2 bg-gray-100 rounded-lg text-sm">🏦 Netbanking</div>
           <div className="px-4 py-2 bg-gray-100 rounded-lg text-sm">👛 Wallets</div>
+        </div>
+      </div>
+
+      {/* Auto-renewal info */}
+      <div className="mt-8 max-w-2xl mx-auto">
+        <div className="flex items-start gap-3 p-4 bg-blue-50 rounded-xl border border-blue-100">
+          <Info className="h-5 w-5 text-blue-500 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-semibold text-blue-800 mb-1">About Auto-Renewal</p>
+            <p className="text-sm text-blue-700">
+              Your subscription will be active for the selected period (monthly or yearly).
+              To enable automatic renewal via UPI AutoPay, select &quot;Save card/UPI for future payments&quot;
+              in the Razorpay checkout. You can manage or cancel your subscription anytime from your{' '}
+              <Link href="/profile" className="underline font-semibold hover:text-blue-900">profile page</Link>.
+            </p>
+          </div>
         </div>
       </div>
     </div>

@@ -16,6 +16,7 @@ import {
   Check,
   Zap,
   Crown,
+  AlertCircle,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -104,7 +105,7 @@ export default function PhoneSignupPage() {
   const [phone, setPhone] = useState('');
   const [dob, setDob] = useState('');
   const [plan, setPlan] = useState<PlanType>('free');
-  const [channel, setChannel] = useState<Channel>('whatsapp');
+  const [channel, setChannel] = useState<Channel>('sms');
   const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -143,6 +144,19 @@ export default function PhoneSignupPage() {
 
     setLoading(true);
     try {
+      // Pre-check if email is already registered before sending OTP
+      const emailCheckRes = await fetch('/api/auth/check-email-exists', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim().toLowerCase() }),
+      });
+      const emailCheckData = await emailCheckRes.json();
+      if (emailCheckData.exists) {
+        setError('email_taken');
+        setLoading(false);
+        return;
+      }
+
       const res = await fetch('/api/auth/send-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -193,7 +207,6 @@ export default function PhoneSignupPage() {
         );
       } else {
         router.push('/explore');
-        router.refresh();
       }
     } catch {
       setError('Something went wrong. Please try again.');
@@ -255,7 +268,25 @@ export default function PhoneSignupPage() {
           </CardHeader>
 
           <CardContent className="space-y-4">
-            {error && (
+            {error === 'email_taken' && (
+              <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 px-4 py-3 rounded-xl text-sm">
+                <AlertCircle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-semibold text-amber-800">Email already registered</p>
+                  <p className="text-amber-700 mt-0.5">
+                    This email is already linked to an account.{' '}
+                    <Link href="/login" className="font-bold underline hover:text-amber-900">
+                      Log in instead →
+                    </Link>
+                    {' '}or{' '}
+                    <Link href="/phone-login" className="font-bold underline hover:text-amber-900">
+                      sign in with mobile
+                    </Link>
+                  </p>
+                </div>
+              </div>
+            )}
+            {error && error !== 'email_taken' && (
               <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg text-sm">
                 {error}
               </div>

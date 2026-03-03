@@ -46,9 +46,12 @@ export async function GET() {
   let streak = 0;
   let longest = 0;
   let temp = 0;
-  const today = now.toDateString();
-  const yesterday = new Date(now.setDate(now.getDate() - 1)).toDateString();
-  if (uniqueDays.includes(today) || uniqueDays.includes(yesterday)) {
+  const todayStr = now.toDateString();
+  // Use a separate Date object so we don't mutate `now` (mutation would break weekly activity)
+  const yesterdayDate = new Date(now);
+  yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+  const yesterdayStr = yesterdayDate.toDateString();
+  if (uniqueDays.includes(todayStr) || uniqueDays.includes(yesterdayStr)) {
     for (let i = 0; i < uniqueDays.length; i++) {
       const d = new Date(uniqueDays[i]);
       const prev = i > 0 ? new Date(uniqueDays[i - 1]) : null;
@@ -78,13 +81,26 @@ export async function GET() {
 
   // ── Badges ─────────────────────────────────────────────────
   const totalTopics = await prisma.query.count({ where: { userId, status: 'completed' } });
-  const badges: string[] = [];
-  if (streak >= 3)    badges.push('🔥 3-Day Streak');
-  if (streak >= 7)    badges.push('⚡ Week Warrior');
-  if (totalTopics >= 10) badges.push('📚 Knowledge Seeker');
-  if (totalTopics >= 50) badges.push('🧠 Scholar');
-  if (quizAvg >= 80)  badges.push('🏆 Quiz Master');
-  if (quizScores.length >= 5) badges.push('🎯 Quiz Enthusiast');
+  const inlineBadges: string[] = [];
+  if (streak >= 3)    inlineBadges.push('🔥 3-Day Streak');
+  if (streak >= 7)    inlineBadges.push('⚡ Week Warrior');
+  if (totalTopics >= 10) inlineBadges.push('📚 Knowledge Seeker');
+  if (totalTopics >= 50) inlineBadges.push('🧠 Scholar');
+  if (quizAvg >= 80)  inlineBadges.push('🏆 Quiz Master');
+  if (quizScores.length >= 5) inlineBadges.push('🎯 Quiz Enthusiast');
+
+  // Also include formally unlocked achievements from the Achievement system
+  const userAchievements = await prisma.userAchievement.findMany({
+    where: { userId },
+    include: { achievement: { select: { name: true, iconName: true } } },
+    orderBy: { unlockedAt: 'desc' },
+  });
+  const achievementBadges = userAchievements.map(
+    ua => `${ua.achievement.iconName || '🏅'} ${ua.achievement.name}`
+  );
+
+  // Merge, deduplicating by string value
+  const badges = [...new Set([...inlineBadges, ...achievementBadges])];
 
   return NextResponse.json({
     streak,

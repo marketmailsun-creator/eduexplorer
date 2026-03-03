@@ -523,6 +523,11 @@ export function InteractiveResultsView({
               <CardTitle className="flex items-center gap-2 text-base">
                 <Brain className="h-5 w-5 text-pink-600" />
                 Practice Quiz
+                {quizSets.length > 1 && (
+                  <span className="text-xs font-normal text-pink-500 ml-1">
+                    Set {(latestQuiz?.data as any)?.setNumber ?? quizSets.length}
+                  </span>
+                )}
               </CardTitle>
               <div className="flex items-center gap-1">
                 <button
@@ -554,15 +559,19 @@ export function InteractiveResultsView({
           </CardHeader>
           {quizSize !== 'minimized' && (
             <CardContent>
-              {hasQuiz && quiz ? (
-                <PracticeQuizViewer
-                  quiz={quiz}
-                  queryId={query.id}
-                  totalSets={quizSets.length}
-                  isOwner={isOwner}
-                  challengeId={challengeId}
-                />
-              ) : (
+              {(() => {
+                // Always use the latest quiz set's data, not the prop from the server
+                // (the prop may be from the first quiz set due to find() ordering)
+                const activeQuiz = (latestQuiz?.data as any)?.quiz ?? quiz;
+                return activeQuiz ? (
+                  <PracticeQuizViewer
+                    quiz={activeQuiz}
+                    queryId={query.id}
+                    totalSets={quizSets.length}
+                    isOwner={isOwner}
+                    challengeId={challengeId}
+                  />
+                ) : (
                 <div className="text-center py-10 bg-gradient-to-br from-pink-50 to-rose-50 border border-pink-100 rounded-xl">
                   <Brain className="h-14 w-14 mx-auto mb-4 text-pink-400" />
                   <p className="text-gray-600 mb-6">Test your knowledge with a practice quiz</p>
@@ -572,7 +581,8 @@ export function InteractiveResultsView({
                     <p className="text-xs text-gray-400 italic">Only the content owner can generate materials</p>
                   )}
                 </div>
-              )}
+                );
+              })()}
             </CardContent>
           )}
         </Card>
