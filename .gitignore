@@ -58,3 +58,8 @@ android/build/
 *.ipa
 *.apk
 *.aab
+
+# Claude
+*.claude
+*.md    
+*.claude/commands/

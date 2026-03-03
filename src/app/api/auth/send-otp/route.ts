@@ -10,7 +10,7 @@ import {
 
 const sendOtpSchema = z.object({
   phone: z.string().min(1),
-  channel: z.enum(['sms', 'whatsapp']).default('whatsapp'),
+  channel: z.enum(['sms', 'whatsapp']).default('sms'),
 });
 
 export async function POST(req: NextRequest) {

@@ -84,7 +84,7 @@ export default function PhoneLoginPage() {
 
   const [step, setStep] = useState<Step>(1);
   const [phone, setPhone] = useState('');
-  const [channel, setChannel] = useState<Channel>('whatsapp');
+  const [channel, setChannel] = useState<Channel>('sms');
   const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -149,7 +149,6 @@ export default function PhoneLoginPage() {
         setError('Invalid or expired OTP. Please try again or request a new code.');
       } else {
         router.push('/explore');
-        router.refresh();
       }
     } catch {
       setError('Something went wrong. Please try again.');

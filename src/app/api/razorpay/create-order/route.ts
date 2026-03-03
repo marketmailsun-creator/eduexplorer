@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
 
     // Amount in smallest currency unit (paise for INR)
     // Monthly: ₹600, Yearly: ₹6000 (2 months free vs monthly)
-    const amount = plan === 'yearly' ? 600000 : 60000;
+    const amount = plan === 'yearly' ? 499900 : 49900;
     const currency = 'INR'; // Change to 'USD' for international
 
     // Create Razorpay order

@@ -430,14 +430,26 @@ export default function ProfilePage() {
             </div>
           </div>
 
-          {/* Plan badge */}
+          {/* Plan badge + subscription */}
           <div className="flex items-center justify-between px-4 py-3 rounded-xl
                            bg-gradient-to-r from-gray-50 to-gray-100 mb-4">
             <div className="flex items-center gap-2">
-              <Crown className={`h-5 w-5 ${user?.plan === 'pro' ? 'text-yellow-500' : 'text-gray-400'}`} />
-              <span className="font-semibold text-sm text-gray-800">
-                {user?.plan === 'pro' ? 'Pro Plan' : 'Free Plan'}
-              </span>
+              <Crown className={`h-5 w-5 flex-shrink-0 ${user?.plan === 'pro' ? 'text-yellow-500' : 'text-gray-400'}`} />
+              <div>
+                <span className="font-semibold text-sm text-gray-800 block">
+                  {user?.plan === 'pro' ? 'Pro Plan' : 'Free Plan'}
+                </span>
+                {user?.subscription && (
+                  <span className="text-xs text-gray-400 block mt-0.5">
+                    {user.subscription.plan === 'yearly' ? 'Yearly' : 'Monthly'} · Renews{' '}
+                    {new Date(user.subscription.endDate).toLocaleDateString('en-IN', {
+                      day: 'numeric',
+                      month: 'short',
+                      year: 'numeric',
+                    })}
+                  </span>
+                )}
+              </div>
             </div>
             {user?.plan !== 'pro' && (
               <Link

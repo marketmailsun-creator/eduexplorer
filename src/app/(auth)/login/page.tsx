@@ -68,7 +68,6 @@ function LoginContent() {
       setLoading(false);
     } else {
       router.push('/explore');
-      router.refresh();
     }
   }
 
@@ -76,7 +75,7 @@ function LoginContent() {
     setGoogleLoading(true);
     setError('');
     try {
-      await signIn('google', { callbackUrl: '/explore', redirect: true });
+      await signIn('google', { callbackUrl: '/auth/callback?next=/explore', redirect: true });
     } catch {
       setError('Failed to sign in with Google');
       setGoogleLoading(false);

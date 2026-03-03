@@ -160,15 +160,23 @@ export default async function ViewGroupPage({ params }: PageProps) {
                 {group.sharedContent.map((shared: any) => (
                   <Link
                     key={shared.id}
-                    href={`/query/${shared.content.query.id}`}
+                    href={`/results/${shared.content.query.id}`}
                     className="block p-3 border rounded-lg hover:bg-gray-50 transition-colors"
                   >
                     <div className="flex items-start justify-between mb-2">
                       <h4 className="font-medium">
-                        {shared.content.title || shared.content.query.queryText}
+                        {shared.content.query?.queryText || 'Untitled Topic'}
                       </h4>
-                      <span className="text-xs px-2 py-1 bg-purple-100 text-purple-600 rounded">
-                        {shared.content.contentType}
+                      <span className="text-xs px-2 py-1 bg-purple-100 text-purple-600 rounded-full font-medium whitespace-nowrap">
+                        {({
+                          'article': '📄 Article',
+                          'quiz': '🧠 Quiz',
+                          'flashcards': '🃏 Flashcards',
+                          'audio': '🎧 Audio',
+                          'presentation': '📊 Slides',
+                          'diagrams': '📐 Diagrams',
+                          'concept-map': '🗺️ Concept Map',
+                        } as Record<string, string>)[shared.content.contentType] || shared.content.contentType}
                       </span>
                     </div>
                     <div className="flex items-center gap-2 text-sm text-gray-600">

@@ -11,7 +11,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, Check, Zap, Crown, BookOpen, Smartphone, CheckCircle, Phone } from 'lucide-react';
+import { Loader2, Check, Zap, Crown, BookOpen, Smartphone, CheckCircle, Phone, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 import { signIn } from 'next-auth/react';
 
@@ -122,7 +122,18 @@ export default function SignupPage() {
       });
 
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Failed to sign up');
+      if (!response.ok) {
+        const message = data.error || 'Failed to sign up';
+        if (message.includes('User already exists') || message.includes('already exists')) {
+          setError('email_taken');
+        } else if (message.includes('Phone number already in use')) {
+          setError('phone_taken');
+        } else {
+          setError(message);
+        }
+        setLoading(false);
+        return;
+      }
 
       // ✅ Redirect to verify-email page instead of auto-signing in
       router.push(`/verify-email?email=${encodeURIComponent(email)}`);
@@ -352,7 +363,35 @@ export default function SignupPage() {
                 )}
               </div>
 
-              {error && (
+              {error === 'email_taken' && (
+                <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 px-4 py-3 rounded-xl text-sm">
+                  <AlertCircle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-semibold text-amber-800">Email already registered</p>
+                    <p className="text-amber-700 mt-0.5">
+                      This email is already linked to an account.{' '}
+                      <Link href="/login" className="font-bold underline hover:text-amber-900">
+                        Log in instead →
+                      </Link>
+                    </p>
+                  </div>
+                </div>
+              )}
+              {error === 'phone_taken' && (
+                <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 px-4 py-3 rounded-xl text-sm">
+                  <AlertCircle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-semibold text-amber-800">Mobile number already registered</p>
+                    <p className="text-amber-700 mt-0.5">
+                      This mobile number is already linked to an account.{' '}
+                      <Link href="/phone-login" className="font-bold underline hover:text-amber-900">
+                        Log in instead →
+                      </Link>
+                    </p>
+                  </div>
+                </div>
+              )}
+              {error && error !== 'email_taken' && error !== 'phone_taken' && (
                 <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-md text-sm">
                   {error}
                 </div>

@@ -46,10 +46,25 @@ export async function GET() {
     // Don't send the hashed password to the client — just a boolean
     const { password, ...userWithoutPassword } = user;
 
+    // Fetch active subscription for plan details display
+    const subscription = await prisma.subscription.findFirst({
+      where: { userId: session.user.id, status: 'active' },
+      orderBy: { startDate: 'desc' },
+      select: { plan: true, startDate: true, endDate: true, status: true },
+    });
+
     return NextResponse.json({
       ...userWithoutPassword,
       hasPassword: !!password,
       phoneVerified: user.phoneVerified ? user.phoneVerified.toISOString() : null,
+      subscription: subscription
+        ? {
+            plan: subscription.plan,
+            startDate: subscription.startDate.toISOString(),
+            endDate: subscription.endDate.toISOString(),
+            status: subscription.status,
+          }
+        : null,
     });
   } catch (error) {
     console.error('Profile fetch error:', error);

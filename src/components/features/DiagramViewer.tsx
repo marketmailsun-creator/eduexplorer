@@ -1,7 +1,7 @@
 'use client';
 
 import { Card, CardContent } from '@/components/ui/card';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { ChevronLeft, ChevronRight, Loader2, ZoomIn, ZoomOut, RotateCcw, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -17,9 +17,27 @@ interface DiagramViewerProps {
   diagrams: Diagram[];
 }
 
+// Singleton mermaid initializer — loads once per page session
+let mermaidInstance: any = null;
+async function getMermaid() {
+  if (!mermaidInstance) {
+    const mod = await import('mermaid');
+    mermaidInstance = mod.default;
+    mermaidInstance.initialize({
+      startOnLoad: false,
+      theme: 'default',
+      securityLevel: 'loose',
+      fontSize: 14,
+      flowchart: { useMaxWidth: true, htmlLabels: true },
+      mindmap: { useMaxWidth: true },
+    });
+  }
+  return mermaidInstance;
+}
+
 export function DiagramViewer({ diagrams }: DiagramViewerProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [diagramUrls, setDiagramUrls] = useState<Map<number, string>>(new Map());
+  const [svgs, setSvgs] = useState<Map<number, string>>(new Map());
   const [errorIds, setErrorIds] = useState<Set<number>>(new Set());
   const [loadingIds, setLoadingIds] = useState<Set<number>>(new Set());
   const [zoomScale, setZoomScale] = useState(1);
@@ -31,25 +49,33 @@ export function DiagramViewer({ diagrams }: DiagramViewerProps) {
 
   const currentDiagram = diagrams[currentIndex];
 
-  // Encode and set the mermaid.ink URL directly — let <img> handle load/error
-  useEffect(() => {
-    const diagramId = currentDiagram.id;
-    if (!currentDiagram.mermaidCode || diagramUrls.has(diagramId) || errorIds.has(diagramId)) {
-      return;
-    }
+  const renderDiagram = useCallback(async (diagram: Diagram) => {
+    if (!diagram.mermaidCode || svgs.has(diagram.id) || errorIds.has(diagram.id)) return;
 
-    setLoadingIds(prev => new Set(prev).add(diagramId));
-
+    setLoadingIds(prev => new Set(prev).add(diagram.id));
     try {
-      const encoded = btoa(unescape(encodeURIComponent(currentDiagram.mermaidCode)));
-      const imageUrl = `https://mermaid.ink/svg/${encoded}?theme=default`;
-      setDiagramUrls(prev => new Map(prev).set(diagramId, imageUrl));
-    } catch (error) {
-      console.error('Error encoding diagram:', currentDiagram.title, error);
-      setErrorIds(prev => new Set(prev).add(diagramId));
-      setLoadingIds(prev => { const next = new Set(prev); next.delete(diagramId); return next; });
+      const mermaid = await getMermaid();
+      // Generate a unique element ID for this render
+      const elementId = `mermaid-${diagram.id}-${Date.now()}`;
+      const { svg } = await mermaid.render(elementId, diagram.mermaidCode);
+      setSvgs(prev => new Map(prev).set(diagram.id, svg));
+    } catch (err) {
+      console.error('Mermaid render error:', diagram.title, err);
+      setErrorIds(prev => new Set(prev).add(diagram.id));
+    } finally {
+      setLoadingIds(prev => {
+        const next = new Set(prev);
+        next.delete(diagram.id);
+        return next;
+      });
     }
-  }, [currentIndex, retryCount]); // re-run only on navigation or retry
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [svgs, errorIds]);
+
+  useEffect(() => {
+    renderDiagram(currentDiagram);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentIndex, retryCount]);
 
   const nextDiagram = () => {
     if (currentIndex < diagrams.length - 1) {
@@ -72,23 +98,25 @@ export function DiagramViewer({ diagrams }: DiagramViewerProps) {
   const handleRetry = () => {
     const diagramId = currentDiagram.id;
     setErrorIds(prev => { const next = new Set(prev); next.delete(diagramId); return next; });
-    setDiagramUrls(prev => { const next = new Map(prev); next.delete(diagramId); return next; });
+    setSvgs(prev => { const next = new Map(prev); next.delete(diagramId); return next; });
     setLoadingIds(prev => { const next = new Set(prev); next.delete(diagramId); return next; });
     setRetryCount(c => c + 1);
   };
 
-  const renderedUrl = diagramUrls.get(currentDiagram.id);
-  const isLoading = loadingIds.has(currentDiagram.id) || (!renderedUrl && !errorIds.has(currentDiagram.id) && !!currentDiagram.mermaidCode);
+  const renderedSvg = svgs.get(currentDiagram.id);
+  const isLoading = loadingIds.has(currentDiagram.id) || (!renderedSvg && !errorIds.has(currentDiagram.id) && !!currentDiagram.mermaidCode);
   const hasError = errorIds.has(currentDiagram.id);
 
   const DIAGRAM_TYPE_EMOJI: Record<string, string> = {
     flowchart: '🔀',
+    cycle: '🔄',
+    hierarchy: '🏗️',
+    comparison: '⚖️',
+    timeline: '📅',
+    process: '⚙️',
+    'concept-map': '🧠',
+    mindmap: '🧠',
     sequence: '📋',
-    class: '🏗️',
-    state: '⚙️',
-    er: '🗄️',
-    gantt: '📅',
-    pie: '🥧',
   };
   const typeEmoji = DIAGRAM_TYPE_EMOJI[currentDiagram.type?.toLowerCase()] ?? '📊';
 
@@ -150,10 +178,13 @@ export function DiagramViewer({ diagrams }: DiagramViewerProps) {
               {currentDiagram.description}
             </p>
 
-            {/* Diagram Image */}
-            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-indigo-100 rounded-xl overflow-auto flex items-center justify-center min-h-[200px] sm:min-h-[250px] md:min-h-[300px] lg:min-h-[400px]">
+            {/* Diagram SVG */}
+            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-indigo-100 rounded-xl overflow-auto flex items-center justify-center min-h-[200px] sm:min-h-[250px] md:min-h-[300px] lg:min-h-[400px] p-3">
               {isLoading ? (
-                <Loader2 className="h-8 w-8 sm:h-10 sm:w-10 md:h-12 md:w-12 animate-spin text-purple-600" />
+                <div className="text-center">
+                  <Loader2 className="h-8 w-8 sm:h-10 sm:w-10 md:h-12 md:w-12 animate-spin text-purple-600 mx-auto" />
+                  <p className="text-xs text-gray-400 mt-2">Rendering diagram…</p>
+                </div>
               ) : hasError ? (
                 <div className="text-center space-y-3 p-6">
                   <p className="text-sm text-gray-500">Failed to render diagram</p>
@@ -172,30 +203,16 @@ export function DiagramViewer({ diagrams }: DiagramViewerProps) {
                     </details>
                   )}
                 </div>
-              ) : renderedUrl ? (
+              ) : renderedSvg ? (
                 <div
                   style={{
                     transform: `scale(${zoomScale})`,
                     transformOrigin: 'top center',
                     transition: 'transform 0.2s ease',
-                    padding: '12px',
+                    width: '100%',
                   }}
-                >
-                  <img
-                    src={renderedUrl}
-                    alt={currentDiagram.title}
-                    className="max-w-full h-auto object-contain"
-                    onLoad={() => {
-                      setLoadingIds(prev => { const next = new Set(prev); next.delete(currentDiagram.id); return next; });
-                    }}
-                    onError={() => {
-                      console.error('Failed to load diagram image:', currentDiagram.title);
-                      setDiagramUrls(prev => { const next = new Map(prev); next.delete(currentDiagram.id); return next; });
-                      setErrorIds(prev => new Set(prev).add(currentDiagram.id));
-                      setLoadingIds(prev => { const next = new Set(prev); next.delete(currentDiagram.id); return next; });
-                    }}
-                  />
-                </div>
+                  dangerouslySetInnerHTML={{ __html: renderedSvg }}
+                />
               ) : (
                 <div className="text-center p-6">
                   <Loader2 className="h-8 w-8 animate-spin text-purple-400 mx-auto mb-2" />
@@ -207,7 +224,7 @@ export function DiagramViewer({ diagrams }: DiagramViewerProps) {
         </CardContent>
       </Card>
 
-      {/* Navigation - Mobile Optimized */}
+      {/* Navigation */}
       <div className="flex items-center justify-between gap-2 sm:gap-4">
         <Button
           onClick={prevDiagram}
@@ -240,7 +257,7 @@ export function DiagramViewer({ diagrams }: DiagramViewerProps) {
 }
 
 /**
- * Static SVG diagram generator (fallback)
+ * Static SVG diagram generator (fallback utility — kept for compatibility)
  */
 export function generateSimpleSVG(
   title: string,
@@ -251,11 +268,8 @@ export function generateSimpleSVG(
   const height = 400;
 
   let svg = `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">`;
-
-  // Background
   svg += `<rect width="${width}" height="${height}" fill="#f8fafc"/>`;
 
-  // Draw links
   links.forEach(link => {
     const from = nodes[link.from];
     const to = nodes[link.to];
@@ -264,10 +278,8 @@ export function generateSimpleSVG(
     }
   });
 
-  // Arrow marker
   svg += `<defs><marker id="arrowhead" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto"><polygon points="0 0, 10 3, 0 6" fill="#64748b"/></marker></defs>`;
 
-  // Draw nodes
   nodes.forEach((node, index) => {
     const color = index === 0 ? '#60a5fa' : '#4ade80';
     svg += `<rect x="${node.x - 60}" y="${node.y - 20}" width="120" height="40" fill="${color}" rx="8" stroke="white" stroke-width="2"/>`;
