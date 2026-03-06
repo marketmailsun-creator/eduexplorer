@@ -17,6 +17,8 @@ import { signIn } from 'next-auth/react';
 
 type PlanType = 'free' | 'pro';
 
+const emailAuthEnabled = process.env.NEXT_PUBLIC_ENABLE_EMAIL_AUTH === 'true';
+
 export default function SignupPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -32,6 +34,13 @@ export default function SignupPage() {
   const [sendingOtp, setSendingOtp] = useState(false);
   const [otpError, setOtpError] = useState('');
   const [resendCountdown, setResendCountdown] = useState(0);
+
+  // Redirect to phone-signup when email auth is disabled
+  useEffect(() => {
+    if (!emailAuthEnabled) {
+      router.replace('/phone-signup');
+    }
+  }, [router]);
 
   // Countdown timer for OTP resend
   useEffect(() => {
@@ -147,6 +156,9 @@ export default function SignupPage() {
     free: ['5 topics per day', '1 audio per topic', 'Basic quizzes', 'Flashcards'],
     pro: ['Unlimited topics', '5 audios per topic', 'Advanced quizzes', 'Priority AI', 'Study groups', 'Ad-free'],
   };
+
+  // Don't render while redirecting (prevents flash)
+  if (!emailAuthEnabled) return null;
 
   return (
     <div className="min-h-screen grid lg:grid-cols-2">
