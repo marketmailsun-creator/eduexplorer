@@ -16,6 +16,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Loader2, BookOpen, Check, CheckCircle2, AlertCircle, Mail, Smartphone } from 'lucide-react';
 import Link from 'next/link';
 
+const emailAuthEnabled = process.env.NEXT_PUBLIC_ENABLE_EMAIL_AUTH === 'true';
+
 function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -148,7 +150,11 @@ function LoginContent() {
               </div>
             </div>
             <CardTitle className="text-2xl font-bold">Welcome Back</CardTitle>
-            <CardDescription>Sign in to continue your learning journey</CardDescription>
+            <CardDescription>
+              {emailAuthEnabled
+                ? 'Sign in to continue your learning journey'
+                : 'Sign in with your phone or Google account'}
+            </CardDescription>
           </CardHeader>
 
           <CardContent className="space-y-4">
@@ -237,47 +243,54 @@ function LoginContent() {
               </Link>
             </Button>
 
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-300" />
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-white px-2 text-gray-500">or sign in with email</span>
-              </div>
-            </div>
-
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium mb-2">Email</label>
-                <Input name="email" type="email" placeholder="you@example.com" required disabled={loading || googleLoading} className="h-11" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-2">Password</label>
-                <Input name="password" type="password" placeholder="••••••••" required disabled={loading || googleLoading} className="h-11" />
-              </div>
-              <div className="flex justify-end">
-                <Link href="/forgot-password" className="text-xs text-indigo-600 hover:text-indigo-800 font-medium">
-                  Forgot password?
-                </Link>
-              </div>
-              {error && (
-                <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-md text-sm">
-                  {error}
+            {emailAuthEnabled && (
+              <>
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-gray-300" />
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-white px-2 text-gray-500">or sign in with email</span>
+                  </div>
                 </div>
-              )}
 
-              <Button
-                type="submit"
-                disabled={loading || googleLoading}
-                className="w-full h-11 text-base bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
-              >
-                {loading ? <><Loader2 className="mr-2 h-5 w-5 animate-spin" />Signing in...</> : 'Sign In'}
-              </Button>
-            </form>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Email</label>
+                    <Input name="email" type="email" placeholder="you@example.com" required disabled={loading || googleLoading} className="h-11" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Password</label>
+                    <Input name="password" type="password" placeholder="••••••••" required disabled={loading || googleLoading} className="h-11" />
+                  </div>
+                  <div className="flex justify-end">
+                    <Link href="/forgot-password" className="text-xs text-indigo-600 hover:text-indigo-800 font-medium">
+                      Forgot password?
+                    </Link>
+                  </div>
+                  {error && (
+                    <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-md text-sm">
+                      {error}
+                    </div>
+                  )}
+
+                  <Button
+                    type="submit"
+                    disabled={loading || googleLoading}
+                    className="w-full h-11 text-base bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+                  >
+                    {loading ? <><Loader2 className="mr-2 h-5 w-5 animate-spin" />Signing in...</> : 'Sign In'}
+                  </Button>
+                </form>
+              </>
+            )}
 
             <div className="text-center text-sm">
               <span className="text-gray-600">Don't have an account? </span>
-              <Link href="/signup" className="text-blue-600 hover:text-blue-700 font-semibold hover:underline">
+              <Link
+                href={emailAuthEnabled ? '/signup' : '/phone-signup'}
+                className="text-blue-600 hover:text-blue-700 font-semibold hover:underline"
+              >
                 Sign up for free
               </Link>
             </div>

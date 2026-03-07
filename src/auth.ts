@@ -5,6 +5,7 @@ import { PrismaAdapter } from '@auth/prisma-adapter';
 import { prisma } from '@/lib/db/prisma';
 import bcrypt from 'bcryptjs';
 import { verifyOtp, normalizePhone } from '@/lib/services/otp.service';
+import { getAdminAuth } from '@/lib/firebase/firebase-admin';
 
 function calculateAge(dateOfBirth: Date | null): number | null {
   if (!dateOfBirth) return null;
@@ -169,8 +170,107 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         };
       },
     }),
+
+    // ── Firebase Phone Auth provider ────────────────────────────────────────
+    // Accepts a Firebase ID token (verified client-side by Firebase).
+    // Server verifies the token with Firebase Admin SDK, then finds or creates
+    // the user in Prisma. No Twilio/DLT registration required.
+    CredentialsProvider({
+      id: 'firebase-phone',
+      name: 'Firebase Phone',
+      credentials: {
+        idToken: { label: 'Firebase ID Token', type: 'text' },
+        name: { label: 'Name', type: 'text' },
+        email: { label: 'Email', type: 'email' },
+        dob: { label: 'Date of Birth', type: 'text' },
+        plan: { label: 'Plan', type: 'text' },
+      },
+      async authorize(credentials) {
+        if (!credentials?.idToken) return null;
+
+        const adminAuth = getAdminAuth();
+        if (!adminAuth) return null; // Firebase Admin not configured
+
+        // 1. Verify the Firebase ID token server-side
+        let decodedToken;
+        try {
+          decodedToken = await adminAuth.verifyIdToken(credentials.idToken as string);
+        } catch {
+          return null; // Invalid or expired token
+        }
+
+        const phone = decodedToken.phone_number;
+        if (!phone) return null; // Token must have phone_number claim
+
+        // 2. LOGIN flow: find existing user by phone
+        const existingUser = await prisma.user.findUnique({ where: { phone } });
+
+        if (existingUser) {
+          await prisma.user.update({
+            where: { id: existingUser.id },
+            data: { phoneVerified: new Date() },
+          });
+          return {
+            id: existingUser.id,
+            email: existingUser.email,
+            name: existingUser.name,
+            image: existingUser.image,
+            plan: existingUser.plan,
+            age: existingUser.age,
+          };
+        }
+
+        // 3. SIGNUP flow: create new user — requires name + email + dob
+        const nameVal = (credentials?.name as string)?.trim();
+        const emailVal = (credentials?.email as string)?.trim().toLowerCase();
+        const dobVal = credentials?.dob as string;
+        const planVal = (credentials?.plan as string) || 'free';
+
+        if (!nameVal || !emailVal || !dobVal) return null;
+
+        // Check email uniqueness
+        const emailTaken = await prisma.user.findUnique({ where: { email: emailVal } });
+        if (emailTaken) throw new Error('email_taken');
+
+        const dobDate = new Date(dobVal);
+        const age = calculateAge(dobDate);
+        if (age !== null && age < 13) throw new Error('age_restriction');
+
+        const newUser = await prisma.user.create({
+          data: {
+            name: nameVal,
+            email: emailVal,
+            phone,
+            phoneVerified: new Date(),
+            emailVerified: new Date(), // Phone OTP = identity verified
+            dateOfBirth: dobDate,
+            age,
+            plan: planVal === 'pro' ? 'pro' : 'free',
+          },
+        });
+
+        await prisma.userPreferences.create({
+          data: {
+            userId: newUser.id,
+            learningLevel: 'college',
+            preferredVoice: 'professional',
+            autoAudio: false,
+            theme: 'light',
+          },
+        });
+
+        return {
+          id: newUser.id,
+          email: newUser.email,
+          name: newUser.name,
+          image: newUser.image,
+          plan: newUser.plan,
+          age: newUser.age,
+        };
+      },
+    }),
   ],
-  
+
   callbacks: {
     async signIn({ user, account, profile }) {
       if (account?.provider === 'google') {

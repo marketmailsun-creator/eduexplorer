@@ -9,7 +9,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import {
   Loader2,
   BookOpen,
-  MessageCircle,
   Smartphone,
   ArrowLeft,
   RefreshCw,
@@ -19,8 +18,9 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import Link from 'next/link';
+import { firebaseAuth } from '@/lib/firebase/firebase-client';
+import { signInWithPhoneNumber, RecaptchaVerifier, ConfirmationResult } from 'firebase/auth';
 
-type Channel = 'whatsapp' | 'sms';
 type Step = 1 | 2;
 type PlanType = 'free' | 'pro';
 
@@ -89,12 +89,24 @@ function OtpInput({
   );
 }
 
-// ── Main page ──────────────────────────────────────────────────────────────
+// ── Normalize phone to E.164 ───────────────────────────────────────────────
+
+function toE164(raw: string): string | null {
+  const digits = raw.replace(/\D/g, '');
+  if (digits.length === 10 && /^[6-9]/.test(digits)) return `+91${digits}`;
+  if (digits.length === 12 && digits.startsWith('91')) return `+${digits}`;
+  if (digits.length === 13 && digits.startsWith('91')) return `+${digits}`;
+  return null;
+}
+
+// ── Plan features ──────────────────────────────────────────────────────────
 
 const planFeatures = {
   free: ['5 topics per day', '1 audio per topic', 'Basic quizzes', 'Flashcards'],
   pro: ['Unlimited topics', '5 audios per topic', 'Advanced quizzes', 'Priority AI', 'Study groups', 'Ad-free'],
 };
+
+// ── Main page ──────────────────────────────────────────────────────────────
 
 export default function PhoneSignupPage() {
   const router = useRouter();
@@ -105,11 +117,17 @@ export default function PhoneSignupPage() {
   const [phone, setPhone] = useState('');
   const [dob, setDob] = useState('');
   const [plan, setPlan] = useState<PlanType>('free');
-  const [channel, setChannel] = useState<Channel>('sms');
   const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [countdown, setCountdown] = useState(0);
+
+  const confirmationRef = useRef<ConfirmationResult | null>(null);
+  const recaptchaRef = useRef<RecaptchaVerifier | null>(null);
+
+  const isLocalhost =
+    typeof window !== 'undefined' &&
+    (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
 
   // Countdown timer for resend
   useEffect(() => {
@@ -117,6 +135,13 @@ export default function PhoneSignupPage() {
     const id = setInterval(() => setCountdown((c) => c - 1), 1000);
     return () => clearInterval(id);
   }, [countdown]);
+
+  // Cleanup reCAPTCHA on unmount
+  useEffect(() => {
+    return () => {
+      recaptchaRef.current?.clear();
+    };
+  }, []);
 
   // Max DOB: must be 13+ years old
   const maxDob = new Date(new Date().setFullYear(new Date().getFullYear() - 13))
@@ -142,6 +167,12 @@ export default function PhoneSignupPage() {
       return;
     }
 
+    const e164 = toE164(phone);
+    if (!e164) {
+      setError('Enter a valid 10-digit Indian mobile number.');
+      return;
+    }
+
     setLoading(true);
     try {
       // Pre-check if email is already registered before sending OTP
@@ -153,32 +184,55 @@ export default function PhoneSignupPage() {
       const emailCheckData = await emailCheckRes.json();
       if (emailCheckData.exists) {
         setError('email_taken');
-        setLoading(false);
         return;
       }
 
-      const res = await fetch('/api/auth/send-otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: `+91${phone}`, channel }),
+      // Clear previous reCAPTCHA if exists
+      if (recaptchaRef.current) {
+        recaptchaRef.current.clear();
+        recaptchaRef.current = null;
+      }
+
+      // Initialize invisible reCAPTCHA
+      recaptchaRef.current = new RecaptchaVerifier(firebaseAuth, 'recaptcha-container', {
+        size: 'invisible',
       });
-      const data = await res.json();
 
-      if (!res.ok) {
-        setError(data.error || 'Failed to send OTP. Please try again.');
-        return;
-      }
-
+      const result = await signInWithPhoneNumber(firebaseAuth, e164, recaptchaRef.current);
+      confirmationRef.current = result;
       setStep(2);
       setOtp('');
       setCountdown(60);
-    } catch {
-      setError('Network error. Please check your connection and try again.');
+    } catch (err: unknown) {
+      const code = (err as { code?: string })?.code ?? '';
+      const msg = err instanceof Error ? err.message : String(err);
+
+      if (code === 'auth/too-many-requests' || msg.includes('too-many-requests')) {
+        setError('Too many OTP requests. Please wait a few minutes and try again.');
+      } else if (code === 'auth/invalid-phone-number' || msg.includes('invalid-phone-number')) {
+        setError('Invalid phone number. Please enter a valid Indian mobile number.');
+      } else if (code === 'auth/quota-exceeded' || msg.includes('quota-exceeded')) {
+        setError('SMS quota exceeded. Please try again later.');
+      } else if (
+        code === 'auth/captcha-check-failed' ||
+        code === 'auth/app-not-authorized' ||
+        code === 'auth/missing-client-identifier'
+      ) {
+        setError(
+          isLocalhost
+            ? 'Localhost blocked by reCAPTCHA. Add "localhost" to Firebase Console → Authentication → Authorized Domains, then use a test phone number (+91 9999999999, OTP: 123456).'
+            : 'reCAPTCHA verification failed. Please refresh the page and try again.'
+        );
+      } else {
+        setError(`Failed to send OTP. Please try again. (${code || 'unknown error'})`);
+      }
+      recaptchaRef.current?.clear();
+      recaptchaRef.current = null;
     } finally {
       setLoading(false);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [name, email, phone, dob, channel]);
+  }, [name, email, phone, dob, isLocalhost]);
 
   const handleVerifyOtp = useCallback(async () => {
     setError('');
@@ -186,12 +240,18 @@ export default function PhoneSignupPage() {
       setError('Please enter all 6 digits of your OTP.');
       return;
     }
+    if (!confirmationRef.current) {
+      setError('Session expired. Please request a new OTP.');
+      return;
+    }
 
     setLoading(true);
     try {
-      const result = await signIn('phone-otp', {
-        phone: `+91${phone}`,
-        code: otp.replace(/\s/g, ''),
+      const credential = await confirmationRef.current.confirm(otp.replace(/\s/g, ''));
+      const idToken = await credential.user.getIdToken();
+
+      const result = await signIn('firebase-phone', {
+        idToken,
         name: name.trim(),
         email: email.trim().toLowerCase(),
         dob,
@@ -199,21 +259,28 @@ export default function PhoneSignupPage() {
         redirect: false,
       });
 
-      if (result?.error) {
-        setError(
-          result.error === 'EmailAlreadyExists'
-            ? 'This email is already registered. Please use a different email or sign in.'
-            : 'Invalid or expired OTP. Please try again or request a new code.'
-        );
+      if (result?.error === 'email_taken') {
+        setError('email_taken');
+      } else if (result?.error === 'age_restriction') {
+        setError('You must be at least 13 years old to register.');
+      } else if (result?.error) {
+        setError('Signup failed. Please try again.');
       } else {
         router.push('/explore');
       }
-    } catch {
-      setError('Something went wrong. Please try again.');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes('invalid-verification-code')) {
+        setError('Incorrect OTP. Please check the code and try again.');
+      } else if (msg.includes('code-expired')) {
+        setError('OTP has expired. Please request a new code.');
+      } else {
+        setError('Verification failed. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
-  }, [otp, phone, name, email, dob, plan, router]);
+  }, [otp, name, email, dob, plan, router]);
 
   const normalizedDisplay = phone.replace(/(\d{5})(\d{5})/, '$1 $2');
 
@@ -227,7 +294,7 @@ export default function PhoneSignupPage() {
           </div>
           <h1 className="text-4xl font-extrabold mb-3">Join EduExplorer</h1>
           <p className="text-blue-100 text-lg leading-relaxed">
-            Sign up with your mobile number. Verify instantly via WhatsApp or SMS.
+            Sign up with your mobile number. Verify instantly via SMS.
           </p>
         </div>
         <div className="grid grid-cols-3 gap-4 pt-8 border-t border-white/20">
@@ -242,6 +309,9 @@ export default function PhoneSignupPage() {
 
       {/* Right side — Form */}
       <div className="flex items-center justify-center p-6 bg-gray-50 overflow-y-auto">
+        {/* Invisible reCAPTCHA container */}
+        <div id="recaptcha-container" />
+
         <Card className="w-full max-w-md shadow-xl my-4">
           <CardHeader className="text-center space-y-1">
             <div className="lg:hidden flex justify-center mb-4">
@@ -261,7 +331,7 @@ export default function PhoneSignupPage() {
                 <CardDescription>
                   Code sent to{' '}
                   <span className="font-semibold text-gray-800">+91 {normalizedDisplay}</span>{' '}
-                  via {channel === 'whatsapp' ? 'WhatsApp' : 'SMS'}
+                  via SMS
                 </CardDescription>
               </>
             )}
@@ -275,12 +345,8 @@ export default function PhoneSignupPage() {
                   <p className="font-semibold text-amber-800">Email already registered</p>
                   <p className="text-amber-700 mt-0.5">
                     This email is already linked to an account.{' '}
-                    <Link href="/login" className="font-bold underline hover:text-amber-900">
-                      Log in instead →
-                    </Link>
-                    {' '}or{' '}
                     <Link href="/phone-login" className="font-bold underline hover:text-amber-900">
-                      sign in with mobile
+                      Sign in with mobile
                     </Link>
                   </p>
                 </div>
@@ -295,6 +361,12 @@ export default function PhoneSignupPage() {
             {/* ── Step 1: Signup form ── */}
             {step === 1 && (
               <div className="space-y-4">
+                {isLocalhost && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-800">
+                    <strong>Dev mode:</strong> Use test number <code>9999999999</code> with OTP <code>123456</code>{' '}
+                    (Firebase Console → Authentication → Phone → Test numbers)
+                  </div>
+                )}
                 {/* Plan selector */}
                 <div className="grid grid-cols-2 gap-3">
                   {(['free', 'pro'] as PlanType[]).map((p) => (
@@ -396,37 +468,6 @@ export default function PhoneSignupPage() {
                   <p className="text-xs text-gray-500 mt-1">You must be 13 or older</p>
                 </div>
 
-                {/* Channel toggle */}
-                <div>
-                  <label className="block text-sm font-medium mb-2">Send OTP via</label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setChannel('whatsapp')}
-                      className={`flex items-center justify-center gap-2 h-10 rounded-lg border-2 text-sm font-medium transition-all ${
-                        channel === 'whatsapp'
-                          ? 'border-green-500 bg-green-50 text-green-700'
-                          : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
-                      }`}
-                    >
-                      <MessageCircle className="h-4 w-4" />
-                      WhatsApp
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setChannel('sms')}
-                      className={`flex items-center justify-center gap-2 h-10 rounded-lg border-2 text-sm font-medium transition-all ${
-                        channel === 'sms'
-                          ? 'border-blue-500 bg-blue-50 text-blue-700'
-                          : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
-                      }`}
-                    >
-                      <Smartphone className="h-4 w-4" />
-                      SMS
-                    </button>
-                  </div>
-                </div>
-
                 <Button
                   onClick={handleSendOtp}
                   disabled={loading}
@@ -444,11 +485,6 @@ export default function PhoneSignupPage() {
                 </Button>
 
                 <div className="space-y-2 text-center text-sm text-gray-600">
-                  <div>
-                    <Link href="/signup" className="text-blue-600 hover:text-blue-700 font-medium">
-                      Sign up with email instead
-                    </Link>
-                  </div>
                   <div>
                     Already have an account?{' '}
                     <Link href="/phone-login" className="text-blue-600 hover:text-blue-700 font-semibold hover:underline">

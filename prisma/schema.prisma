@@ -115,6 +115,7 @@ model User {
 
   phone         String?   @unique   // E.164 format: +91XXXXXXXXXX
   phoneVerified DateTime?            // set when OTP is successfully verified
+  fcmToken      String?              // Firebase Cloud Messaging token (native push)
 
   pushSubscriptions PushSubscription[]
   subscription Subscription[]

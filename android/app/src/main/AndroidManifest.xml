@@ -22,6 +22,20 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
+            <!-- App Links: handles https://www.eduexplorer.ai/auth/callback from Chrome -->
+            <!-- Requires /.well-known/assetlinks.json to be hosted with correct SHA-256 -->
+            <!-- To get your SHA-256: keytool -list -v -keystore ~/.android/debug.keystore -->
+            <!--   -alias androiddebugkey -storepass android -keypass android             -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="https"
+                    android:host="www.eduexplorer.ai"
+                    android:pathPrefix="/auth/callback" />
+            </intent-filter>
+
         </activity>
 
         <provider

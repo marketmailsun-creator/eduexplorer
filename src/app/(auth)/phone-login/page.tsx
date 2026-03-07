@@ -6,10 +6,13 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, BookOpen, MessageCircle, Smartphone, ArrowLeft, RefreshCw } from 'lucide-react';
+import { Loader2, BookOpen, Smartphone, ArrowLeft, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
+import { firebaseAuth } from '@/lib/firebase/firebase-client';
+import { signInWithPhoneNumber, RecaptchaVerifier, ConfirmationResult } from 'firebase/auth';
 
-type Channel = 'whatsapp' | 'sms';
+const emailAuthEnabled = process.env.NEXT_PUBLIC_ENABLE_EMAIL_AUTH === 'true';
+
 type Step = 1 | 2;
 
 // ── OTP input component ────────────────────────────────────────────────────
@@ -77,6 +80,16 @@ function OtpInput({
   );
 }
 
+// ── Normalize phone to E.164 ───────────────────────────────────────────────
+
+function toE164(raw: string): string | null {
+  const digits = raw.replace(/\D/g, '');
+  if (digits.length === 10 && /^[6-9]/.test(digits)) return `+91${digits}`;
+  if (digits.length === 12 && digits.startsWith('91')) return `+${digits}`;
+  if (digits.length === 13 && digits.startsWith('91')) return `+${digits}`;
+  return null;
+}
+
 // ── Main page ──────────────────────────────────────────────────────────────
 
 export default function PhoneLoginPage() {
@@ -84,11 +97,17 @@ export default function PhoneLoginPage() {
 
   const [step, setStep] = useState<Step>(1);
   const [phone, setPhone] = useState('');
-  const [channel, setChannel] = useState<Channel>('sms');
   const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [countdown, setCountdown] = useState(0);
+
+  const confirmationRef = useRef<ConfirmationResult | null>(null);
+  const recaptchaRef = useRef<RecaptchaVerifier | null>(null);
+
+  const isLocalhost =
+    typeof window !== 'undefined' &&
+    (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
 
   // Countdown timer for resend
   useEffect(() => {
@@ -97,38 +116,70 @@ export default function PhoneLoginPage() {
     return () => clearInterval(id);
   }, [countdown]);
 
+  // Cleanup reCAPTCHA on unmount
+  useEffect(() => {
+    return () => {
+      recaptchaRef.current?.clear();
+    };
+  }, []);
+
   const normalizedDisplay = phone.replace(/(\d{5})(\d{5})/, '$1 $2');
 
   const handleSendOtp = useCallback(async () => {
     setError('');
-    if (!/^[6-9]\d{9}$/.test(phone)) {
+    const e164 = toE164(phone);
+    if (!e164) {
       setError('Enter a valid 10-digit Indian mobile number.');
       return;
     }
 
     setLoading(true);
     try {
-      const res = await fetch('/api/auth/send-otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: `+91${phone}`, channel }),
-      });
-      const data = await res.json();
-
-      if (!res.ok) {
-        setError(data.error || 'Failed to send OTP. Please try again.');
-        return;
+      // Clear previous reCAPTCHA if exists
+      if (recaptchaRef.current) {
+        recaptchaRef.current.clear();
+        recaptchaRef.current = null;
       }
 
+      // Initialize invisible reCAPTCHA attached to the container div
+      recaptchaRef.current = new RecaptchaVerifier(firebaseAuth, 'recaptcha-container', {
+        size: 'invisible',
+      });
+
+      const result = await signInWithPhoneNumber(firebaseAuth, e164, recaptchaRef.current);
+      confirmationRef.current = result;
       setStep(2);
       setOtp('');
       setCountdown(60);
-    } catch {
-      setError('Network error. Please check your connection and try again.');
+    } catch (err: unknown) {
+      const code = (err as { code?: string })?.code ?? '';
+      const msg = err instanceof Error ? err.message : String(err);
+
+      if (code === 'auth/too-many-requests' || msg.includes('too-many-requests')) {
+        setError('Too many OTP requests. Please wait a few minutes and try again.');
+      } else if (code === 'auth/invalid-phone-number' || msg.includes('invalid-phone-number')) {
+        setError('Invalid phone number. Please enter a valid Indian mobile number.');
+      } else if (code === 'auth/quota-exceeded' || msg.includes('quota-exceeded')) {
+        setError('SMS quota exceeded. Please try again later.');
+      } else if (
+        code === 'auth/captcha-check-failed' ||
+        code === 'auth/app-not-authorized' ||
+        code === 'auth/missing-client-identifier'
+      ) {
+        setError(
+          isLocalhost
+            ? 'Localhost blocked by reCAPTCHA. Add "localhost" to Firebase Console → Authentication → Authorized Domains, then use a test phone number (+91 9999999999, OTP: 123456).'
+            : 'reCAPTCHA verification failed. Please refresh the page and try again.'
+        );
+      } else {
+        setError(`Failed to send OTP. Please try again. (${code || 'unknown error'})`);
+      }
+      recaptchaRef.current?.clear();
+      recaptchaRef.current = null;
     } finally {
       setLoading(false);
     }
-  }, [phone, channel]);
+  }, [phone, isLocalhost]);
 
   const handleVerifyOtp = useCallback(async () => {
     setError('');
@@ -136,26 +187,43 @@ export default function PhoneLoginPage() {
       setError('Please enter all 6 digits of your OTP.');
       return;
     }
+    if (!confirmationRef.current) {
+      setError('Session expired. Please request a new OTP.');
+      return;
+    }
 
     setLoading(true);
     try {
-      const result = await signIn('phone-otp', {
-        phone: `+91${phone}`,
-        code: otp.replace(/\s/g, ''),
+      const credential = await confirmationRef.current.confirm(otp.replace(/\s/g, ''));
+      const idToken = await credential.user.getIdToken();
+
+      const result = await signIn('firebase-phone', {
+        idToken,
         redirect: false,
       });
 
       if (result?.error) {
-        setError('Invalid or expired OTP. Please try again or request a new code.');
+        if (result.error === 'CredentialsSignin') {
+          setError('No account found for this number. Please sign up first.');
+        } else {
+          setError('Login failed. Please try again.');
+        }
       } else {
         router.push('/explore');
       }
-    } catch {
-      setError('Something went wrong. Please try again.');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes('invalid-verification-code')) {
+        setError('Incorrect OTP. Please check the code and try again.');
+      } else if (msg.includes('code-expired')) {
+        setError('OTP has expired. Please request a new code.');
+      } else {
+        setError('Verification failed. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
-  }, [otp, phone, router]);
+  }, [otp, router]);
 
   return (
     <div className="min-h-screen grid lg:grid-cols-2">
@@ -185,8 +253,8 @@ export default function PhoneLoginPage() {
               <span className="text-sm font-bold">2</span>
             </div>
             <div>
-              <p className="font-semibold">Receive OTP on WhatsApp or SMS</p>
-              <p className="text-green-100 text-sm">6-digit code, valid for 5 minutes</p>
+              <p className="font-semibold">Receive OTP via SMS</p>
+              <p className="text-green-100 text-sm">6-digit code, valid for a few minutes</p>
             </div>
           </div>
           <div className="flex items-start gap-3">
@@ -195,7 +263,7 @@ export default function PhoneLoginPage() {
             </div>
             <div>
               <p className="font-semibold">Enter code &amp; start learning</p>
-              <p className="text-green-100 text-sm">Instant access — no verification email</p>
+              <p className="text-green-100 text-sm">Instant access — no email verification</p>
             </div>
           </div>
         </div>
@@ -203,6 +271,9 @@ export default function PhoneLoginPage() {
 
       {/* Right side — Form */}
       <div className="flex items-center justify-center p-6 bg-gray-50">
+        {/* Invisible reCAPTCHA container */}
+        <div id="recaptcha-container" />
+
         <Card className="w-full max-w-md shadow-xl">
           <CardHeader className="space-y-1 text-center">
             <div className="lg:hidden flex justify-center mb-4">
@@ -222,7 +293,7 @@ export default function PhoneLoginPage() {
                 <CardDescription>
                   We sent a 6-digit code to{' '}
                   <span className="font-semibold text-gray-800">+91 {normalizedDisplay}</span>{' '}
-                  via {channel === 'whatsapp' ? 'WhatsApp' : 'SMS'}
+                  via SMS
                 </CardDescription>
               </>
             )}
@@ -238,7 +309,12 @@ export default function PhoneLoginPage() {
             {/* ── Step 1: Phone input ── */}
             {step === 1 && (
               <div className="space-y-4">
-                {/* Phone input */}
+                {isLocalhost && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-800">
+                    <strong>Dev mode:</strong> Use test number <code>9999999999</code> with OTP <code>123456</code>{' '}
+                    (Firebase Console → Authentication → Phone → Test numbers)
+                  </div>
+                )}
                 <div>
                   <label className="block text-sm font-medium mb-2">Mobile Number</label>
                   <div className="flex">
@@ -259,37 +335,6 @@ export default function PhoneLoginPage() {
                   <p className="text-xs text-gray-500 mt-1">10-digit Indian mobile number</p>
                 </div>
 
-                {/* Channel toggle */}
-                <div>
-                  <label className="block text-sm font-medium mb-2">Receive OTP via</label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setChannel('whatsapp')}
-                      className={`flex items-center justify-center gap-2 h-10 rounded-lg border-2 text-sm font-medium transition-all ${
-                        channel === 'whatsapp'
-                          ? 'border-green-500 bg-green-50 text-green-700'
-                          : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
-                      }`}
-                    >
-                      <MessageCircle className="h-4 w-4" />
-                      WhatsApp
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setChannel('sms')}
-                      className={`flex items-center justify-center gap-2 h-10 rounded-lg border-2 text-sm font-medium transition-all ${
-                        channel === 'sms'
-                          ? 'border-blue-500 bg-blue-50 text-blue-700'
-                          : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
-                      }`}
-                    >
-                      <Smartphone className="h-4 w-4" />
-                      SMS
-                    </button>
-                  </div>
-                </div>
-
                 <Button
                   onClick={handleSendOtp}
                   disabled={loading || phone.length < 10}
@@ -303,11 +348,13 @@ export default function PhoneLoginPage() {
                 </Button>
 
                 <div className="space-y-2 text-center text-sm text-gray-600">
-                  <div>
-                    <Link href="/login" className="text-blue-600 hover:text-blue-700 font-medium">
-                      Use email instead
-                    </Link>
-                  </div>
+                  {emailAuthEnabled && (
+                    <div>
+                      <Link href="/login" className="text-blue-600 hover:text-blue-700 font-medium">
+                        Use email instead
+                      </Link>
+                    </div>
+                  )}
                   <div>
                     New user?{' '}
                     <Link href="/phone-signup" className="text-blue-600 hover:text-blue-700 font-semibold hover:underline">

@@ -1,0 +1,10 @@
+[{
+  "relation": ["delegate_permission/common.handle_all_urls"],
+  "target": {
+    "namespace": "android_app",
+    "package_name": "ai.eduexplorer.app",
+    "sha256_cert_fingerprints": [
+      "84:5F:47:14:77:BF:EE:02:22:F8:D9:44:5E:13:A3:D1:94:3E:7B:82:22:BB:C8:A0:91:3E:99:C6:1B:A4:AE:3F"
+    ]
+  }
+}]
