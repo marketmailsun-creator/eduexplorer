@@ -2,12 +2,14 @@
 // FILE: src/app/api/cron/send-reminders/route.ts
 // Triggered daily by Vercel Cron (see vercel.json).
 // Finds all due reminders and sends push notifications.
+// Uses FCM for native app users, VAPID for browser users.
 // Protect with CRON_SECRET env var.
 // ============================================================
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/prisma';
 import { sendPushNotification } from '@/lib/services/push-notifications.service';
+import { sendFcmNotification } from '@/lib/firebase/firebase-messaging';
 
 export const dynamic = 'force-dynamic';
 
@@ -29,7 +31,7 @@ export async function GET(req: NextRequest) {
       },
       include: {
         query: { select: { queryText: true } },
-        user:  { select: { name: true } },
+        user:  { select: { name: true, fcmToken: true } },
       },
       take: 100, // Process max 100 at a time to stay within timeout
     });
@@ -42,7 +44,6 @@ export async function GET(req: NextRequest) {
     for (const reminder of dueReminders) {
       try {
         const topic = reminder.query.queryText;
-        const userName = reminder.user.name?.split(' ')[0] || 'there';
 
         const payload =
           reminder.dayNumber === 3
@@ -57,9 +58,25 @@ export async function GET(req: NextRequest) {
                 url: `/results/${reminder.queryId}`,
               };
 
-        await sendPushNotification(reminder.userId, payload);
+        // Try FCM first (native app users), fall back to VAPID (browser)
+        const fcmToken = reminder.user.fcmToken;
+        let notified = false;
 
-        // Mark as sent
+        if (fcmToken) {
+          notified = await sendFcmNotification(
+            fcmToken,
+            payload.title,
+            payload.body,
+            { url: payload.url }
+          );
+        }
+
+        // VAPID fallback — always runs for web users; also runs for native if FCM failed
+        if (!notified) {
+          await sendPushNotification(reminder.userId, payload);
+        }
+
+        // Mark as sent regardless of which channel delivered
         await prisma.quizReviewReminder.update({
           where: { id: reminder.id },
           data: { sent: true },

@@ -1,19 +1,17 @@
 /**
- * Initialize Capacitor Push Notifications for native iOS/Android.
+ * Initialize Capacitor Push Notifications for native iOS/Android via FCM.
  * Call this once on app startup in a client component.
  * Does nothing in the browser (Capacitor is only active in native context).
  *
- * ⚠️  IMPORTANT: PushNotifications.register() is intentionally disabled.
- *     Calling register() requires google-services.json + Firebase setup.
- *     Without it, the native FirebaseApp throws IllegalStateException and
- *     crashes the WebView entirely (not catchable from JavaScript).
+ * Prerequisites (required before this runs without crashing):
+ *   1. Firebase project created at https://console.firebase.google.com
+ *   2. Android app added with package name: ai.eduexplorer.app
+ *   3. google-services.json downloaded → placed in android/app/
+ *   4. Run: npm run cap:sync
  *
- *     To enable push notifications:
- *     1. Create a Firebase project at https://console.firebase.google.com
- *     2. Add Android app with package name: ai.eduexplorer.app
- *     3. Download google-services.json → place in android/app/
- *     4. Create backend endpoint: POST /api/push/register-native-token
- *     5. Uncomment the register() block below and re-sync: npm run cap:sync
+ * For iOS:
+ *   5. Apple Developer account required ($99/year)
+ *   6. APNs key uploaded to Firebase Console → Project Settings → Cloud Messaging
  */
 export async function initCapacitorPush() {
   if (typeof window === 'undefined') return;
@@ -22,26 +20,42 @@ export async function initCapacitorPush() {
   try {
     const { PushNotifications } = await import('@capacitor/push-notifications');
 
-    // Request permission only — does NOT crash without google-services.json.
-    // Stores the OS permission state so we don't need to prompt again later.
     const { receive } = await PushNotifications.requestPermissions();
     console.log('[Push] Permission status:', receive);
 
-    // ── Re-enable this block after adding android/app/google-services.json ──
-    // if (receive !== 'granted') return;
-    // await PushNotifications.register();
-    // PushNotifications.addListener('registration', async (token) => {
-    //   console.log('Native push token:', token.value);
-    //   await fetch('/api/push/register-native-token', {
-    //     method: 'POST',
-    //     headers: { 'Content-Type': 'application/json' },
-    //     body: JSON.stringify({ token: token.value }),
-    //   });
-    // });
-    // PushNotifications.addListener('registrationError', (err) => {
-    //   console.error('Push registration error:', err);
-    // });
-    // ────────────────────────────────────────────────────────────────────────
+    if (receive !== 'granted') return;
+
+    // Register with FCM — requires google-services.json in android/app/
+    await PushNotifications.register();
+
+    PushNotifications.addListener('registration', async (token) => {
+      console.log('[Push] FCM token received:', token.value.slice(0, 20) + '...');
+      try {
+        await fetch('/api/push/fcm-register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fcmToken: token.value }),
+        });
+      } catch (err) {
+        console.error('[Push] Failed to save FCM token:', err);
+      }
+    });
+
+    PushNotifications.addListener('registrationError', (err) => {
+      console.error('[Push] FCM registration error:', err);
+    });
+
+    PushNotifications.addListener('pushNotificationReceived', (notification) => {
+      console.log('[Push] Received in foreground:', notification.title);
+    });
+
+    PushNotifications.addListener('pushNotificationActionPerformed', (action) => {
+      // Navigate to the URL from the notification data if present
+      const url = action.notification.data?.url;
+      if (url && typeof window !== 'undefined') {
+        window.location.href = url;
+      }
+    });
   } catch (err) {
     // Capacitor push not available (web context or plugin not loaded) — safe to ignore
     console.log('[Push] Not available:', err);

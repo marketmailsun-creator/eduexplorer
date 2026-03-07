@@ -125,6 +125,10 @@ export default function PhoneSignupPage() {
   const confirmationRef = useRef<ConfirmationResult | null>(null);
   const recaptchaRef = useRef<RecaptchaVerifier | null>(null);
 
+  const isLocalhost =
+    typeof window !== 'undefined' &&
+    (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+
   // Countdown timer for resend
   useEffect(() => {
     if (countdown <= 0) return;
@@ -200,15 +204,27 @@ export default function PhoneSignupPage() {
       setOtp('');
       setCountdown(60);
     } catch (err: unknown) {
+      const code = (err as { code?: string })?.code ?? '';
       const msg = err instanceof Error ? err.message : String(err);
-      if (msg.includes('too-many-requests')) {
+
+      if (code === 'auth/too-many-requests' || msg.includes('too-many-requests')) {
         setError('Too many OTP requests. Please wait a few minutes and try again.');
-      } else if (msg.includes('invalid-phone-number')) {
+      } else if (code === 'auth/invalid-phone-number' || msg.includes('invalid-phone-number')) {
         setError('Invalid phone number. Please enter a valid Indian mobile number.');
-      } else if (msg.includes('quota-exceeded')) {
+      } else if (code === 'auth/quota-exceeded' || msg.includes('quota-exceeded')) {
         setError('SMS quota exceeded. Please try again later.');
+      } else if (
+        code === 'auth/captcha-check-failed' ||
+        code === 'auth/app-not-authorized' ||
+        code === 'auth/missing-client-identifier'
+      ) {
+        setError(
+          isLocalhost
+            ? 'Localhost blocked by reCAPTCHA. Add "localhost" to Firebase Console → Authentication → Authorized Domains, then use a test phone number (+91 9999999999, OTP: 123456).'
+            : 'reCAPTCHA verification failed. Please refresh the page and try again.'
+        );
       } else {
-        setError('Failed to send OTP. Please try again.');
+        setError(`Failed to send OTP. Please try again. (${code || 'unknown error'})`);
       }
       recaptchaRef.current?.clear();
       recaptchaRef.current = null;
@@ -216,7 +232,7 @@ export default function PhoneSignupPage() {
       setLoading(false);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [name, email, phone, dob]);
+  }, [name, email, phone, dob, isLocalhost]);
 
   const handleVerifyOtp = useCallback(async () => {
     setError('');
@@ -345,6 +361,12 @@ export default function PhoneSignupPage() {
             {/* ── Step 1: Signup form ── */}
             {step === 1 && (
               <div className="space-y-4">
+                {isLocalhost && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-800">
+                    <strong>Dev mode:</strong> Use test number <code>9999999999</code> with OTP <code>123456</code>{' '}
+                    (Firebase Console → Authentication → Phone → Test numbers)
+                  </div>
+                )}
                 {/* Plan selector */}
                 <div className="grid grid-cols-2 gap-3">
                   {(['free', 'pro'] as PlanType[]).map((p) => (

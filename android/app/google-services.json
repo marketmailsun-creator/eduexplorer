@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "961051109281",
+    "project_id": "eduexplorer-bf288",
+    "storage_bucket": "eduexplorer-bf288.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:961051109281:android:0025fc630662b968518de0",
+        "android_client_info": {
+          "package_name": "ai.eduexplorer.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD5cLs9zWYByAX-iMglwVK7rqpFOTmnwis"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
