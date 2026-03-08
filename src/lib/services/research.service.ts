@@ -1,7 +1,7 @@
 import OpenAI from 'openai';
 import { prisma } from '../db/prisma';
 import { formatForDisplay } from '../utils/text-cleaning-utils';
-import { getCached, setCache } from '../db/redis';
+import { getCached, setCache, incrementUsageCounter, sendQuotaAlertOnce } from '../db/redis';
 
 interface ResearchResult {
   queryId: string;
@@ -99,6 +99,7 @@ export async function processResearchQuery(params: {
     for (const model of PERPLEXITY_MODELS) {
       try {
         console.log(`🔍 Trying Perplexity model: ${model}`);
+        await incrementUsageCounter('perplexity');
         response = await perplexity.chat.completions.create({
           model,
           messages: [
@@ -125,7 +126,9 @@ export async function processResearchQuery(params: {
     if (!response) {
       // All models failed — delete the query record so it doesn't pollute history
       await prisma.query.delete({ where: { id: query.id } });
-      throw new Error(getFriendlyErrorMessage(lastError));
+      const errMsg = getFriendlyErrorMessage(lastError);
+      await sendQuotaAlertOnce('perplexity', `All Perplexity models failed.\nError: ${errMsg}\nQuery: ${queryText}`);
+      throw new Error(errMsg);
     }
 
     const content = response.choices[0].message.content || '';

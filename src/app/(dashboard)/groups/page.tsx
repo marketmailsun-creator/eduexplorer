@@ -77,15 +77,15 @@ export default async function GroupsPage() {
       {/* Content overlapping the header */}
       <div className="max-w-6xl mx-auto px-4 -mt-10">
         {/* Action buttons */}
-        <div className="flex gap-3 mb-6">
+        <div className="flex gap-3 mb-6 relative z-10">
           <Link href="/groups/create">
-            <Button className="bg-white text-purple-700 hover:bg-purple-50 border border-purple-200 shadow-sm">
+            <Button className="bg-white text-purple-700 hover:bg-purple-50 border border-purple-200 shadow-sm font-semibold">
               <Plus className="h-4 w-4 mr-2" />
               Create Group
             </Button>
           </Link>
           <Link href="/groups/join">
-            <Button variant="outline" className="bg-white border-white/80 shadow-sm">
+            <Button variant="outline" className="bg-white text-gray-700 border-gray-300 hover:bg-gray-50 shadow-sm">
               <UserPlus className="h-4 w-4 mr-2" />
               Join Group
             </Button>

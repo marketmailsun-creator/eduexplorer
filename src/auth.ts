@@ -29,8 +29,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   },
   
   pages: {
-    signIn: '/login',
-    error: '/login',
+    signIn: '/phone-login',
+    error: '/phone-login',
   },
   
   providers: [
@@ -258,6 +258,15 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             theme: 'light',
           },
         });
+
+        // Send welcome email (non-blocking — never fail signup on email error)
+        try {
+          const { sendWelcomeEmail } = await import('@/lib/services/email.service');
+          await sendWelcomeEmail(emailVal, nameVal);
+          console.log('[Auth] Welcome email sent to', emailVal);
+        } catch (emailErr) {
+          console.error('[Auth] Welcome email failed (non-fatal):', emailErr);
+        }
 
         return {
           id: newUser.id,

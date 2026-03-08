@@ -173,7 +173,7 @@ export function Header() {
                       <hr className="my-2" />
 
                       <button
-                        onClick={() => signOut({ callbackUrl: '/login' })}
+                        onClick={() => signOut({ callbackUrl: '/phone-login' })}
                         className="flex items-center gap-2 px-4 py-2 hover:bg-gray-100 transition-colors w-full text-left text-red-600"
                       >
                         <LogOut className="h-4 w-4" />
@@ -316,7 +316,7 @@ export function Header() {
                         </div>
                       </div>
                       <button
-                        onClick={() => { signOut({ callbackUrl: '/login' }); setShowMobileMenu(false); }}
+                        onClick={() => { signOut({ callbackUrl: '/phone-login' }); setShowMobileMenu(false); }}
                         className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-red-50 transition-colors w-full text-left"
                       >
                         <div className="w-9 h-9 rounded-xl bg-red-100 flex items-center justify-center flex-shrink-0">
@@ -334,7 +334,7 @@ export function Header() {
         ) : (
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="sm" asChild>
-              <Link href="/login">Sign In</Link>
+              <Link href="/phone-login">Sign In</Link>
             </Button>
             <Button size="sm" asChild>
               <Link href="/signup">Sign Up</Link>

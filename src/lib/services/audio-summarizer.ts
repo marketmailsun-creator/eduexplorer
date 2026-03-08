@@ -1,10 +1,20 @@
 import Anthropic from '@anthropic-ai/sdk';
+import OpenAI from 'openai';
 import { formatForAudio } from '../utils/text-formatter';
+import { incrementUsageCounter, sendQuotaAlertOnce } from '../db/redis';
 
 const client = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
 const MODEL = 'claude-sonnet-4-5-20250929';
+
+// Groq client — free tier, OpenAI-compatible API
+const groqClient = process.env.GROQ_API_KEY
+  ? new OpenAI({
+      apiKey: process.env.GROQ_API_KEY,
+      baseURL: 'https://api.groq.com/openai/v1',
+    })
+  : null;
 interface AudioSummaryOptions {
   text: string;
   maxDurationMinutes?: number;
@@ -28,6 +38,7 @@ export async function generateAudioSummary(
   const targetWords = maxDurationMinutes * 150; // 150 words per minute
 
   try {
+    await incrementUsageCounter('anthropic');
     const message = await client.messages.create({
       model: MODEL,
       max_tokens: 2000,
@@ -74,9 +85,68 @@ Generate the audio summary now (plain text only, no formatting):`,
 
     return cleanSummary;
   } catch (error) {
-    console.error('Audio summary generation error:', error);
-    // Fallback: truncate original text
+    console.error('Audio summary generation error (Claude):', error);
+    await sendQuotaAlertOnce('anthropic', `Anthropic audio summary failed.\nError: ${error instanceof Error ? error.message : String(error)}`);
+    // Fallback 1: Try Groq (free model)
+    const groqSummary = await generateAudioSummaryWithGroq(options);
+    if (groqSummary) {
+      console.log('✅ Used Groq fallback for audio summary');
+      return groqSummary;
+    }
+    // Fallback 2: Plain truncation
+    console.warn('⚠️ Using plain truncation fallback for audio summary');
     return truncateForAudio(text, targetWords);
+  }
+}
+
+async function generateAudioSummaryWithGroq(
+  options: AudioSummaryOptions
+): Promise<string | null> {
+  if (!groqClient) return null;
+
+  const { text, maxDurationMinutes = 10, learningLevel = 'college' } = options;
+  const targetWords = maxDurationMinutes * 150;
+
+  try {
+    const completion = await groqClient.chat.completions.create({
+      model: 'llama-3.1-8b-instant',
+      max_tokens: 2000,
+      messages: [
+        {
+          role: 'system',
+          content: `You are an expert at creating concise, engaging audio summaries for educational content optimized for text-to-speech.`,
+        },
+        {
+          role: 'user',
+          content: `Create a concise audio summary of this educational content for ${learningLevel} level students.
+
+REQUIREMENTS:
+- Maximum ${targetWords} words (for ${maxDurationMinutes}-minute audio)
+- Focus ONLY on the most important concepts
+- Write for listening, not reading (conversational, clear)
+- No markdown, formatting, or special characters
+- Use simple sentences with natural pauses
+
+STRUCTURE: Brief intro (1-2 sentences) → Main concepts (3-5 points) → Brief conclusion (1 sentence)
+
+ORIGINAL CONTENT:
+${text}
+
+Generate the audio summary now (plain text only):`,
+        },
+      ],
+    });
+
+    const summary = completion.choices[0]?.message?.content ?? null;
+    if (!summary) return null;
+
+    const cleanSummary = formatForAudio(summary);
+    const wordCount = cleanSummary.split(/\s+/).length;
+    console.log(`📝 Groq audio summary: ${wordCount} words`);
+    return cleanSummary;
+  } catch (err) {
+    console.error('[Audio] Groq fallback failed:', err);
+    return null;
   }
 }
 

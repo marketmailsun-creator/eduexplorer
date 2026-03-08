@@ -103,7 +103,7 @@ export default function PrivacyPage() {
           <section>
             <h2 className="text-xl font-semibold text-gray-900 mb-3">8. Data Deletion Requests</h2>
             <p className="text-gray-700 leading-relaxed">
-              To delete your account and all associated data, go to Profile → Settings → Delete Account, or email us at <a href="mailto:privacy@eduexplorer.ai" className="text-indigo-600 hover:underline">privacy@eduexplorer.ai</a> with the subject "Data Deletion Request". We will process your request within 7 business days.
+              To delete your account and all associated data, go to Profile → Settings → Delete Account, or email us at <a href="mailto:admin@eduexplorer.ai" className="text-indigo-600 hover:underline">admin@eduexplorer.ai</a> with the subject "Data Deletion Request". We will process your request within 7 business days.
             </p>
           </section>
 

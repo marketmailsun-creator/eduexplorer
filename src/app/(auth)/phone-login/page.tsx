@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect, Suspense } from 'react';
 import { signIn } from 'next-auth/react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -92,8 +92,10 @@ function toE164(raw: string): string | null {
 
 // ── Main page ──────────────────────────────────────────────────────────────
 
-export default function PhoneLoginPage() {
+function PhoneLoginContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const callbackUrl = searchParams.get('callbackUrl') || '/explore';
 
   const [step, setStep] = useState<Step>(1);
   const [phone, setPhone] = useState('');
@@ -209,7 +211,8 @@ export default function PhoneLoginPage() {
           setError('Login failed. Please try again.');
         }
       } else {
-        router.push('/explore');
+        // Use callbackUrl if it starts with / (internal only, prevents open redirect)
+        router.push(callbackUrl.startsWith('/') ? callbackUrl : '/explore');
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -228,44 +231,42 @@ export default function PhoneLoginPage() {
   return (
     <div className="min-h-screen grid lg:grid-cols-2">
       {/* Left side — Brand */}
-      <div className="hidden lg:flex flex-col justify-center bg-gradient-to-br from-green-500 via-emerald-600 to-teal-700 p-12 text-white">
-        <div className="mb-8">
+      <div className="hidden lg:flex flex-col justify-center bg-gradient-to-br from-green-600 via-emerald-600 to-teal-700 p-12 text-white">
+        <div className="mb-10">
           <div className="p-3 bg-white/20 rounded-xl w-fit mb-6">
             <BookOpen className="h-10 w-10 text-white" />
           </div>
           <h1 className="text-4xl font-extrabold mb-3">EduExplorer</h1>
           <p className="text-green-100 text-lg leading-relaxed">
-            Sign in instantly with your mobile number. No email, no passwords — just a quick OTP.
+            Type any topic. Get a full AI lesson in seconds.
           </p>
         </div>
-        <div className="bg-white/10 rounded-2xl p-6 space-y-4">
-          <div className="flex items-start gap-3">
-            <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0 mt-0.5">
-              <span className="text-sm font-bold">1</span>
+
+        {/* Feature showcase cards */}
+        <div className="space-y-3 mb-8">
+          {[
+            { icon: '🧠', title: 'AI-Generated Articles', desc: 'Deep-dive lessons on any subject instantly' },
+            { icon: '🎯', title: 'Interactive Quizzes', desc: 'Test yourself and track what you know' },
+            { icon: '🃏', title: 'Smart Flashcards', desc: 'Spaced repetition for long-term memory' },
+            { icon: '🎙️', title: 'Audio Narration', desc: 'Listen to summaries on the go' },
+          ].map(({ icon, title, desc }) => (
+            <div key={title} className="flex items-start gap-3 bg-white/10 rounded-xl p-3">
+              <span className="text-2xl flex-shrink-0">{icon}</span>
+              <div>
+                <p className="font-semibold text-sm">{title}</p>
+                <p className="text-green-100 text-xs">{desc}</p>
+              </div>
             </div>
-            <div>
-              <p className="font-semibold">Enter your mobile number</p>
-              <p className="text-green-100 text-sm">Your 10-digit Indian mobile number</p>
+          ))}
+        </div>
+
+        <div className="grid grid-cols-3 gap-4 border-t border-white/20 pt-6">
+          {[['30s', 'Avg lesson time'], ['50K+', 'Learners'], ['4.9★', 'Rating']].map(([val, label]) => (
+            <div key={label}>
+              <div className="text-2xl font-extrabold">{val}</div>
+              <div className="text-green-100 text-xs">{label}</div>
             </div>
-          </div>
-          <div className="flex items-start gap-3">
-            <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0 mt-0.5">
-              <span className="text-sm font-bold">2</span>
-            </div>
-            <div>
-              <p className="font-semibold">Receive OTP via SMS</p>
-              <p className="text-green-100 text-sm">6-digit code, valid for a few minutes</p>
-            </div>
-          </div>
-          <div className="flex items-start gap-3">
-            <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0 mt-0.5">
-              <span className="text-sm font-bold">3</span>
-            </div>
-            <div>
-              <p className="font-semibold">Enter code &amp; start learning</p>
-              <p className="text-green-100 text-sm">Instant access — no email verification</p>
-            </div>
-          </div>
+          ))}
         </div>
       </div>
 
@@ -412,5 +413,13 @@ export default function PhoneLoginPage() {
         </Card>
       </div>
     </div>
+  );
+}
+
+export default function PhoneLoginPage() {
+  return (
+    <Suspense>
+      <PhoneLoginContent />
+    </Suspense>
   );
 }

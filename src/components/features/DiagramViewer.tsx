@@ -17,22 +17,31 @@ interface DiagramViewerProps {
   diagrams: Diagram[];
 }
 
-// Singleton mermaid initializer — loads once per page session
-let mermaidInstance: any = null;
-async function getMermaid() {
-  if (!mermaidInstance) {
+// Module-level counter for unique element IDs (avoids Date.now() collisions under rapid navigation)
+let renderCounter = 0;
+
+// Singleton module load — loads mermaid once
+let mermaidMod: any = null;
+async function loadMermaid() {
+  if (!mermaidMod) {
     const mod = await import('mermaid');
-    mermaidInstance = mod.default;
-    mermaidInstance.initialize({
-      startOnLoad: false,
-      theme: 'default',
-      securityLevel: 'loose',
-      fontSize: 14,
-      flowchart: { useMaxWidth: true, htmlLabels: true },
-      mindmap: { useMaxWidth: true },
-    });
+    mermaidMod = mod.default;
   }
-  return mermaidInstance;
+  return mermaidMod;
+}
+
+// Always reinit before render to clear stale state from previous diagrams
+async function getMermaid() {
+  const mermaid = await loadMermaid();
+  mermaid.initialize({
+    startOnLoad: false,
+    theme: 'default',
+    securityLevel: 'loose',
+    fontSize: 14,
+    flowchart: { useMaxWidth: true, htmlLabels: true },
+    mindmap: { useMaxWidth: true },
+  });
+  return mermaid;
 }
 
 export function DiagramViewer({ diagrams }: DiagramViewerProps) {
@@ -55,9 +64,15 @@ export function DiagramViewer({ diagrams }: DiagramViewerProps) {
     setLoadingIds(prev => new Set(prev).add(diagram.id));
     try {
       const mermaid = await getMermaid();
-      // Generate a unique element ID for this render
-      const elementId = `mermaid-${diagram.id}-${Date.now()}`;
-      const { svg } = await mermaid.render(elementId, diagram.mermaidCode);
+      // Use module-level counter for stable unique IDs
+      const elementId = `mermaid-diagram-${++renderCounter}`;
+      // Belt-and-suspenders: sanitize parens inside [...] labels client-side too
+      let codeToRender = diagram.mermaidCode;
+      codeToRender = codeToRender.replace(/\[([^\]]*)\]/g, (_match: string, inner: string) => {
+        const cleaned = inner.replace(/\(/g, '{').replace(/\)/g, '}');
+        return `[${cleaned}]`;
+      });
+      const { svg } = await mermaid.render(elementId, codeToRender);
       setSvgs(prev => new Map(prev).set(diagram.id, svg));
     } catch (err) {
       console.error('Mermaid render error:', diagram.title, err);
