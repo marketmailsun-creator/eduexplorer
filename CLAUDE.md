@@ -26,16 +26,10 @@ npm run test             # jest --watch
 npm run test:ci          # jest --ci (no watch, for CI)
 
 # Database
-npm run db:migrate       # create + apply migration (USE THIS for all schema changes)
-npm run db:migrate:deploy # apply pending migrations (runs automatically in vercel-build)
-npm run db:push          # ⚠️  DEV ONLY: sync schema without a migration file — NEVER use for real changes
+npm run db:push          # push schema changes (no migration history)
+npm run db:migrate       # create and apply migration (dev)
+npm run db:migrate:deploy # apply migrations (production)
 npm run db:studio        # Prisma Studio GUI
-
-# Schema change workflow:
-# 1. Edit prisma/schema.prisma
-# 2. npm run db:migrate -- --name describe_your_change
-# 3. Commit the generated prisma/migrations/TIMESTAMP_name/ folder alongside schema.prisma
-# Vercel deployment runs `prisma migrate deploy` automatically (see vercel-build script).
 
 # Docker (local dev infrastructure)
 npm run docker:dev       # start PostgreSQL + Redis containers
