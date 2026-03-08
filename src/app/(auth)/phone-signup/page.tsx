@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect, Suspense } from 'react';
 import { signIn } from 'next-auth/react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -108,8 +108,10 @@ const planFeatures = {
 
 // ── Main page ──────────────────────────────────────────────────────────────
 
-export default function PhoneSignupPage() {
+function PhoneSignupContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const callbackUrl = searchParams.get('callbackUrl') || '/explore';
 
   const [step, setStep] = useState<Step>(1);
   const [name, setName] = useState('');
@@ -121,6 +123,7 @@ export default function PhoneSignupPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [countdown, setCountdown] = useState(0);
+  const [phoneAlreadyRegistered, setPhoneAlreadyRegistered] = useState(false);
 
   const confirmationRef = useRef<ConfirmationResult | null>(null);
   const recaptchaRef = useRef<RecaptchaVerifier | null>(null);
@@ -161,6 +164,7 @@ export default function PhoneSignupPage() {
 
   const handleSendOtp = useCallback(async () => {
     setError('');
+    setPhoneAlreadyRegistered(false);
     const validationError = validateStep1();
     if (validationError) {
       setError(validationError);
@@ -184,6 +188,20 @@ export default function PhoneSignupPage() {
       const emailCheckData = await emailCheckRes.json();
       if (emailCheckData.exists) {
         setError('email_taken');
+        setLoading(false);
+        return;
+      }
+
+      // Pre-check if phone is already registered before sending OTP
+      const phoneCheckRes = await fetch('/api/auth/check-phone-exists', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone }),
+      });
+      const phoneCheckData = await phoneCheckRes.json();
+      if (phoneCheckData.exists) {
+        setPhoneAlreadyRegistered(true);
+        setLoading(false);
         return;
       }
 
@@ -266,7 +284,8 @@ export default function PhoneSignupPage() {
       } else if (result?.error) {
         setError('Signup failed. Please try again.');
       } else {
-        router.push('/explore');
+        // Use callbackUrl if it starts with / (internal only, prevents open redirect)
+        router.push(callbackUrl.startsWith('/') ? callbackUrl : '/explore');
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -292,16 +311,40 @@ export default function PhoneSignupPage() {
           <div className="p-3 bg-white/20 rounded-xl w-fit mb-6">
             <BookOpen className="h-10 w-10 text-white" />
           </div>
-          <h1 className="text-4xl font-extrabold mb-3">Join EduExplorer</h1>
-          <p className="text-blue-100 text-lg leading-relaxed">
-            Sign up with your mobile number. Verify instantly via SMS.
+          <h1 className="text-4xl font-extrabold mb-2">Join EduExplorer</h1>
+          <p className="text-blue-100 text-base leading-relaxed">
+            Free forever. No credit card. No DLT spam.
           </p>
         </div>
-        <div className="grid grid-cols-3 gap-4 pt-8 border-t border-white/20">
-          {[['1M+', 'Topics'], ['50K+', 'Learners'], ['4.9★', 'Rating']].map(([val, label]) => (
-            <div key={label}>
-              <div className="text-3xl font-bold">{val}</div>
-              <div className="text-blue-100 text-sm">{label}</div>
+
+        {/* Simulated search preview */}
+        <div className="bg-white/10 rounded-2xl p-4 mb-6 border border-white/20">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="w-2 h-2 rounded-full bg-green-400"></div>
+            <span className="text-xs text-green-200 font-medium">Live example</span>
+          </div>
+          <div className="bg-white/20 rounded-lg px-3 py-2 text-sm font-medium mb-3">
+            🔍 &ldquo;How does gravity work?&rdquo;
+          </div>
+          <div className="space-y-1.5">
+            {['📄 AI Article generated', '🎯 5 quiz questions ready', '🃏 10 flashcards created', '🎙️ 3-min audio summary'].map(item => (
+              <div key={item} className="flex items-center gap-2 text-xs text-blue-100">
+                <div className="w-1.5 h-1.5 rounded-full bg-green-400 flex-shrink-0"></div>
+                {item}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* What's included */}
+        <div className="space-y-2">
+          <p className="text-xs text-blue-200 font-semibold uppercase tracking-wider mb-2">Free plan includes</p>
+          {['5 AI lessons daily', 'Quizzes & Flashcards', 'Learning streak tracking', 'Study groups', 'Global leaderboard'].map(f => (
+            <div key={f} className="flex items-center gap-2 text-sm">
+              <div className="w-4 h-4 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
+                <Check className="h-2.5 w-2.5" />
+              </div>
+              <span className="text-blue-100">{f}</span>
             </div>
           ))}
         </div>
@@ -352,6 +395,20 @@ export default function PhoneSignupPage() {
                 </div>
               </div>
             )}
+            {phoneAlreadyRegistered && (
+              <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 px-4 py-3 rounded-xl text-sm">
+                <AlertCircle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-semibold text-amber-800">Number already registered</p>
+                  <p className="text-amber-700 mt-0.5">
+                    This mobile number already has an account.{' '}
+                    <Link href="/phone-login" className="font-bold underline hover:text-amber-900">
+                      Sign in with OTP
+                    </Link>
+                  </p>
+                </div>
+              </div>
+            )}
             {error && error !== 'email_taken' && (
               <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg text-sm">
                 {error}
@@ -390,7 +447,7 @@ export default function PhoneSignupPage() {
                         )}
                         <span className="font-bold text-sm capitalize">{p}</span>
                         {p === 'pro' && (
-                          <span className="text-xs text-purple-600 font-semibold">₹999/mo</span>
+                          <span className="text-xs text-purple-600 font-semibold">499/mo</span>
                         )}
                         {p === 'free' && (
                           <span className="text-xs text-blue-600 font-semibold">Free</span>
@@ -546,5 +603,13 @@ export default function PhoneSignupPage() {
         </Card>
       </div>
     </div>
+  );
+}
+
+export default function PhoneSignupPage() {
+  return (
+    <Suspense>
+      <PhoneSignupContent />
+    </Suspense>
   );
 }

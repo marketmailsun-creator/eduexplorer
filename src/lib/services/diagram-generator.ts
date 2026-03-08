@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { incrementUsageCounter, sendQuotaAlertOnce } from '../db/redis';
 
 const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
 const genAI = GOOGLE_API_KEY ? new GoogleGenerativeAI(GOOGLE_API_KEY) : null;
@@ -10,6 +11,33 @@ export interface Diagram {
   description: string;
   mermaidCode?: string;
   svgContent?: string;
+}
+
+/**
+ * Sanitize mermaid code to prevent parser failures.
+ * Removes parentheses from inside rectangular bracket labels [...]
+ * since Mermaid interprets () inside nodes as shape markers.
+ * Also strips quotes that can break string parsing.
+ */
+function sanitizeMermaidCode(code: string): string {
+  if (!code) return code;
+  // Replace ( and ) inside [...] labels with { and }
+  let result = code.replace(/\[([^\]]*)\]/g, (_match: string, inner: string) => {
+    const cleaned = inner
+      .replace(/\(/g, '{')
+      .replace(/\)/g, '}')
+      .replace(/"/g, "'")
+      .replace(/`/g, "'");
+    return `[${cleaned}]`;
+  });
+  // Also clean parenthetical node labels without brackets: node(text) where text has nested parens
+  result = result.replace(/\(([^)]*)\)/g, (match: string, inner: string) => {
+    if (inner.includes('(') || inner.includes(')')) {
+      return `(${inner.replace(/\(/g, '{').replace(/\)/g, '}')})`;
+    }
+    return match;
+  });
+  return result;
 }
 
 /**
@@ -114,6 +142,7 @@ Return ONLY valid JSON:
 Generate ${count} diagrams now (include at least one concept-map using mindmap syntax):`;
 
   try {
+    await incrementUsageCounter('gemini');
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const text = response.text();
@@ -132,9 +161,14 @@ Generate ${count} diagrams now (include at least one concept-map using mindmap s
       console.log(`  - ${d.title} (${d.type})`);
     });
 
+    // Sanitize all diagram codes before returning
+    diagrams.forEach(d => {
+      if (d.mermaidCode) d.mermaidCode = sanitizeMermaidCode(d.mermaidCode);
+    });
     return diagrams;
   } catch (error: any) {
     console.error('❌ Diagram generation error:', error.message);
+    await sendQuotaAlertOnce('gemini', `Gemini diagram generation failed.\nError: ${error.message}`);
     return generateTemplateDiagrams(topic, articleText, count);
   }
 }
@@ -195,6 +229,10 @@ function generateTemplateDiagrams(topic: string, content: string, count: number)
     });
   }
 
+  // Sanitize all diagram codes before returning
+  diagrams.forEach(d => {
+    if (d.mermaidCode) d.mermaidCode = sanitizeMermaidCode(d.mermaidCode);
+  });
   console.log(`✅ Generated ${diagrams.length} template diagrams`);
   return diagrams;
 }

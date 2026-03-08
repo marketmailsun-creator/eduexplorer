@@ -1,12 +1,15 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useSession } from 'next-auth/react';
+import { useSearchParams } from 'next/navigation';
 import { Crown, Check, Sparkles, Zap } from 'lucide-react';
 import Link from 'next/link';
 
-export default function UpgradeSuccessPage() {
+function UpgradeSuccessContent() {
   const { update } = useSession();
+  const searchParams = useSearchParams();
+  const returnTo = searchParams.get('returnTo') || '/explore';
   const [refreshed, setRefreshed] = useState(false);
 
   useEffect(() => {
@@ -63,7 +66,7 @@ export default function UpgradeSuccessPage() {
         {/* CTA Buttons */}
         <div className="space-y-3">
           <Link
-            href="/explore"
+            href={returnTo}
             className="flex items-center justify-center gap-2 w-full py-3.5 px-6 bg-gradient-to-r from-violet-600 to-purple-600 text-white font-bold rounded-xl hover:from-violet-700 hover:to-purple-700 transition-all shadow-md shadow-purple-200"
           >
             <Zap className="h-4 w-4" />
@@ -84,5 +87,13 @@ export default function UpgradeSuccessPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function UpgradeSuccessPage() {
+  return (
+    <Suspense>
+      <UpgradeSuccessContent />
+    </Suspense>
   );
 }

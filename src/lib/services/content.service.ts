@@ -5,6 +5,7 @@ import { writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
 import { existsSync } from 'fs';
 import { formatForDisplay } from '../utils/text-formatter';
+import { incrementUsageCounter, sendQuotaAlertOnce } from '../db/redis';
 
 // Use Groq (OpenAI-compatible API)
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
@@ -48,6 +49,7 @@ Structure:
 Make it engaging, clear, and appropriate for ${learningLevel} level.`;
 
   try {
+    await incrementUsageCounter('groq');
     const response = await groq.chat.completions.create({
       model: 'llama-3.1-8b-instant', // FREE, fast, good quality
       messages: [
@@ -70,6 +72,7 @@ Make it engaging, clear, and appropriate for ${learningLevel} level.`;
     return article;
   } catch (error: any) {
     console.error('❌ Groq article generation error:', error.message);
+    await sendQuotaAlertOnce('groq', `Groq article generation failed.\nError: ${error.message}`);
     throw error;
   }
 }

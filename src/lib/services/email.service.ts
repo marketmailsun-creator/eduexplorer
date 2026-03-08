@@ -7,7 +7,7 @@
 // ============================================================
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY!;
-const EMAIL_FROM = process.env.EMAIL_FROM || 'EduExplorer <noreply@eduexplorer.ai>';
+const EMAIL_FROM = process.env.EMAIL_FROM || 'EduExplorer <admin@eduexplorer.ai>';
 const APP_URL = process.env.AUTH_URL || process.env.NEXTAUTH_URL || 'https://www.eduexplorer.ai';
 
 interface SendEmailOptions {
@@ -216,6 +216,49 @@ export async function sendWelcomeEmail(email: string, name: string) {
   });
 }
 
+// ── Admin alert email (quota warnings, system alerts) ────────
+export async function sendAdminAlert(subject: string, body: string) {
+  const adminEmail = process.env.ADMIN_EMAIL;
+  if (!adminEmail) {
+    console.warn('⚠️ ADMIN_EMAIL not set — skipping admin alert:', subject);
+    return;
+  }
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8" /><title>EduExplorer Alert</title></head>
+<body style="margin:0;padding:0;background:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="padding:40px 20px;">
+    <tr>
+      <td align="center">
+        <table width="100%" style="max-width:560px;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,0.08);">
+          <tr>
+            <td style="background:#dc2626;padding:24px 32px;text-align:center;">
+              <h1 style="margin:0;color:#ffffff;font-size:18px;font-weight:700;">⚠️ EduExplorer System Alert</h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:28px 32px;">
+              <pre style="margin:0;color:#1f2937;font-size:14px;line-height:1.7;white-space:pre-wrap;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">${body}</pre>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:16px 32px;border-top:1px solid #f1f5f9;text-align:center;">
+              <p style="margin:0;color:#9ca3af;font-size:12px;">Sent by EduExplorer monitoring · ${new Date().toISOString()}</p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `;
+
+  return sendEmail({ to: adminEmail, subject: `[EduExplorer Alert] ${subject}`, html });
+}
+
 // ── Account deletion confirmation email ──────────────────────
 export async function sendAccountDeletionEmail(email: string, name: string) {
   const html = `
@@ -246,7 +289,7 @@ export async function sendAccountDeletionEmail(email: string, name: string) {
               </p>
               <div style="background:#fef2f2;border-radius:8px;padding:16px;border:1px solid #fecaca;">
                 <p style="margin:0;color:#b91c1c;font-size:13px;">
-                  If you did NOT request this deletion, please contact us immediately at <strong>support@eduexplorer.ai</strong>
+                  If you did NOT request this deletion, please contact us immediately at <strong>admin@eduexplorer.ai</strong>
                 </p>
               </div>
             </td>

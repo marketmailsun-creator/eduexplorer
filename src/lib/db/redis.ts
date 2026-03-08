@@ -81,3 +81,51 @@ export async function clearCachePattern(pattern: string): Promise<void> {
     console.error('Redis clear pattern error:', error);
   }
 }
+
+/**
+ * Increment a daily API usage counter for a named service.
+ * Key format: quota:<service>:<YYYY-MM-DD>  — expires after 30 days.
+ * Returns the new counter value, or null on error.
+ */
+export async function incrementUsageCounter(service: string): Promise<number | null> {
+  try {
+    const date = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+    const key = `quota:${service}:${date}`;
+    const count = await redis.incr(key);
+    // Set TTL on first write (30 days)
+    if (count === 1) {
+      await redis.expire(key, 60 * 60 * 24 * 30);
+    }
+    return count;
+  } catch (error) {
+    console.error('Redis incrementUsageCounter error:', error);
+    return null;
+  }
+}
+
+/**
+ * Send a quota alert email at most once per service per day.
+ * Uses a Redis dedup key so repeated errors don't spam the inbox.
+ */
+export async function sendQuotaAlertOnce(
+  service: string,
+  details: string
+): Promise<void> {
+  try {
+    const date = new Date().toISOString().slice(0, 10);
+    const alertKey = `quota:alert:${service}:${date}`;
+    // NX = only set if key doesn't exist (atomic dedup)
+    const set = await redis.set(alertKey, '1', { nx: true, ex: 60 * 60 * 24 });
+    if (set === null) {
+      // Already alerted today for this service
+      return;
+    }
+    const { sendAdminAlert } = await import('@/lib/services/email.service');
+    await sendAdminAlert(
+      `API quota / error: ${service}`,
+      `Service: ${service}\nDate: ${date}\n\n${details}`
+    );
+  } catch (err) {
+    console.error('sendQuotaAlertOnce failed (non-fatal):', err);
+  }
+}

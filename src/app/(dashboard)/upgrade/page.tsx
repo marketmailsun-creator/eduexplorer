@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, Suspense } from 'react';
 import { useSession } from 'next-auth/react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -15,9 +15,11 @@ declare global {
   }
 }
 
-export default function UpgradePage() {
+function UpgradePageContent() {
   const { data: session } = useSession();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const returnTo = searchParams.get('returnTo') || '/explore';
   const [loading, setLoading] = useState<'monthly' | 'yearly' | null>(null);
 
   // Redirect pro users to profile — they're already subscribed
@@ -89,7 +91,7 @@ export default function UpgradePage() {
           });
 
           if (verifyResponse.ok) {
-            window.location.href = '/upgrade/success';
+            window.location.href = `/upgrade/success?returnTo=${encodeURIComponent(returnTo)}`;
           } else {
             alert('Payment verification failed');
           }
@@ -296,5 +298,13 @@ export default function UpgradePage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function UpgradePage() {
+  return (
+    <Suspense>
+      <UpgradePageContent />
+    </Suspense>
   );
 }
