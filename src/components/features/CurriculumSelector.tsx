@@ -34,7 +34,7 @@ export function CurriculumSelector() {
     if (!chapter || !classNum || !subject) return;
     const classLabel = curriculum.classes.find(c => c.classNumber === classNum)?.label ?? `Class ${classNum}`;
     const query = `${board} ${classLabel} ${subject}: ${chapter.name} — complete chapter overview`;
-    router.push(`/explore?q=${encodeURIComponent(query)}`);
+    router.push(`/explore?q=${encodeURIComponent(query)}&autoSubmit=1`);
   };
 
   const exploreChapterQuiz = () => {

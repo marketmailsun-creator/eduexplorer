@@ -18,6 +18,7 @@ const groqClient = process.env.GROQ_API_KEY
 interface AudioSummaryOptions {
   text: string;
   maxDurationMinutes?: number;
+  minDurationMinutes?: number;
   learningLevel?: string;
 }
 
@@ -31,47 +32,50 @@ export async function generateAudioSummary(
 ): Promise<string> {
   const {
     text,
-    maxDurationMinutes = 10,
+    maxDurationMinutes = 7,
+    minDurationMinutes = 3,
     learningLevel = 'college',
   } = options;
 
-  const targetWords = maxDurationMinutes * 150; // 150 words per minute
+  const minWords = minDurationMinutes * 150; // 150 words per minute
+  const maxWords = maxDurationMinutes * 150;
 
   if (!genAI) {
     console.warn('⚠️ GOOGLE_API_KEY missing — using Groq fallback for audio summary');
     const groqSummary = await generateAudioSummaryWithGroq(options);
     if (groqSummary) return groqSummary;
-    return truncateForAudio(text, targetWords);
+    return truncateForAudio(text, maxWords);
   }
 
   try {
     await incrementUsageCounter('gemini');
     const geminiModel = genAI.getGenerativeModel({
       model: MODEL,
-      systemInstruction: `You are an expert at creating concise, engaging audio summaries for educational content.
-Your summaries are optimized for text-to-speech and listening comprehension.`,
+      systemInstruction: `You are an expert at creating thorough, engaging audio narrations for educational content.
+Your narrations are optimized for text-to-speech and listening comprehension.`,
     });
 
-    const prompt = `Create a concise audio summary of this educational content for ${learningLevel} level students.
+    const prompt = `Create a comprehensive audio narration of this educational content for ${learningLevel} level students.
 
 REQUIREMENTS:
-- Maximum ${targetWords} words (for ${maxDurationMinutes}-minute audio)
-- Focus ONLY on the most important concepts and key points
+- BETWEEN ${minWords} and ${maxWords} words — you MUST write at least ${minWords} words
+- Cover all major concepts, mechanisms, and examples from the content
+- Do not truncate — write a thorough, complete narration
 - Write for listening, not reading (conversational, clear)
 - No markdown, formatting, or special characters
-- Use simple sentences with natural pauses
-- Include only essential information
+- Use smooth transitions between topics
 - Make it engaging and easy to follow when spoken
 
 STRUCTURE:
-1. Brief introduction (1-2 sentences)
-2. Main concepts (3-5 key points)
-3. Brief conclusion (1 sentence)
+1. Engaging introduction (1-2 paragraphs — hook the listener, state what they will learn)
+2. Core concepts explained in depth (cover each major concept with explanation and examples — this is the bulk of the narration)
+3. Real-world applications or significance (1-2 paragraphs)
+4. Memorable conclusion (1 paragraph — recap key insights)
 
 ORIGINAL CONTENT:
 ${text}
 
-Generate the audio summary now (plain text only, no formatting):`;
+Generate the audio narration now (plain text only, no formatting):`;
 
     const result = await geminiModel.generateContent(prompt);
     const summary = result.response.text();
@@ -81,7 +85,7 @@ Generate the audio summary now (plain text only, no formatting):`;
 
     // Verify word count
     const wordCount = cleanSummary.split(/\s+/).length;
-    console.log(`📝 Audio summary generated (Gemini): ${wordCount} words (~${Math.ceil(wordCount / 150)} minutes)`);
+    console.log(`📝 Audio narration generated (Gemini): ${wordCount} words (~${Math.ceil(wordCount / 150)} minutes)`);
 
     return cleanSummary;
   } catch (error) {
@@ -95,7 +99,7 @@ Generate the audio summary now (plain text only, no formatting):`;
     }
     // Fallback 2: Plain truncation
     console.warn('⚠️ Using plain truncation fallback for audio summary');
-    return truncateForAudio(text, targetWords);
+    return truncateForAudio(text, maxWords);
   }
 }
 
@@ -104,35 +108,37 @@ async function generateAudioSummaryWithGroq(
 ): Promise<string | null> {
   if (!groqClient) return null;
 
-  const { text, maxDurationMinutes = 10, learningLevel = 'college' } = options;
-  const targetWords = maxDurationMinutes * 150;
+  const { text, maxDurationMinutes = 7, minDurationMinutes = 3, learningLevel = 'college' } = options;
+  const minWords = minDurationMinutes * 150;
+  const maxWords = maxDurationMinutes * 150;
 
   try {
     const completion = await groqClient.chat.completions.create({
       model: 'llama-3.1-8b-instant',
-      max_tokens: 2000,
+      max_tokens: 3000,
       messages: [
         {
           role: 'system',
-          content: `You are an expert at creating concise, engaging audio summaries for educational content optimized for text-to-speech.`,
+          content: `You are an expert at creating thorough, engaging audio narrations for educational content optimized for text-to-speech.`,
         },
         {
           role: 'user',
-          content: `Create a concise audio summary of this educational content for ${learningLevel} level students.
+          content: `Create a comprehensive audio narration of this educational content for ${learningLevel} level students.
 
 REQUIREMENTS:
-- Maximum ${targetWords} words (for ${maxDurationMinutes}-minute audio)
-- Focus ONLY on the most important concepts
+- BETWEEN ${minWords} and ${maxWords} words — you MUST write at least ${minWords} words
+- Cover all major concepts, mechanisms, and examples from the content
+- Do not truncate — write a thorough, complete narration
 - Write for listening, not reading (conversational, clear)
 - No markdown, formatting, or special characters
-- Use simple sentences with natural pauses
+- Use smooth transitions between topics
 
-STRUCTURE: Brief intro (1-2 sentences) → Main concepts (3-5 points) → Brief conclusion (1 sentence)
+STRUCTURE: Engaging intro (1-2 paragraphs) → Core concepts in depth (cover each concept with examples) → Real-world applications → Memorable conclusion
 
 ORIGINAL CONTENT:
 ${text}
 
-Generate the audio summary now (plain text only):`,
+Generate the audio narration now (plain text only):`,
         },
       ],
     });
@@ -142,7 +148,7 @@ Generate the audio summary now (plain text only):`,
 
     const cleanSummary = formatForAudio(summary);
     const wordCount = cleanSummary.split(/\s+/).length;
-    console.log(`📝 Groq audio summary: ${wordCount} words`);
+    console.log(`📝 Groq audio narration: ${wordCount} words (~${Math.ceil(wordCount / 150)} minutes)`);
     return cleanSummary;
   } catch (err) {
     console.error('[Audio] Groq fallback failed:', err);

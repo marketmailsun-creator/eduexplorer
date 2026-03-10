@@ -81,12 +81,14 @@ export async function POST(req: NextRequest) {
 
     // Get learning level from the associated query
     const learningLevel = (content.query as any).complexityLevel || 'college';
-    const maxDurationMinutes = hasOnDemandAccess ? 10 : 5; // Pro: 10 min, Free: 5 min
+    const minDurationMinutes = 3;
+    const maxDurationMinutes = 7;
 
-    // Generate AI-optimized audio script using Claude instead of raw article text
-    console.log(`🤖 Generating AI audio script for user ${session.user.id} (${hasOnDemandAccess ? 'PRO' : 'FREE'}, ${maxDurationMinutes}min target)...`);
+    // Generate AI-optimized audio narration
+    console.log(`🤖 Generating AI audio narration for user ${session.user.id} (${hasOnDemandAccess ? 'PRO' : 'FREE'}, ${minDurationMinutes}–${maxDurationMinutes}min target)...`);
     const audioScript = await generateAudioSummary({
       text,
+      minDurationMinutes,
       maxDurationMinutes,
       learningLevel,
     });
