@@ -124,6 +124,8 @@ interface SplitLayoutExploreProps {
    useEffect(() => {
      const q = searchParams.get('q');
      if (q) setQuery(decodeURIComponent(q));
+     const lvl = searchParams.get('level');
+     if (lvl) setLevel(lvl);
    }, [searchParams]);
 
   // Auto-submit when both ?q and ?autoQuiz=1 are in the URL (from CurriculumSelector).
@@ -134,6 +136,8 @@ interface SplitLayoutExploreProps {
     const autoQuiz = searchParams.get('autoQuiz');
     if (q && autoQuiz === '1' && autoSubmitKeyRef.current !== q) {
       autoSubmitKeyRef.current = q;
+      // Clean URL so browser-back doesn't re-trigger submission
+      router.replace(`/explore?q=${q}`);
       const decodedQ = decodeURIComponent(q);
       const timer = setTimeout(() => {
         proceedWithSubmit(true, decodedQ);
@@ -150,6 +154,8 @@ interface SplitLayoutExploreProps {
     const autoSubmit = searchParams.get('autoSubmit');
     if (q && autoSubmit === '1' && autoSubmitKeyRef.current !== q) {
       autoSubmitKeyRef.current = q;
+      // Clean URL so browser-back doesn't re-trigger submission
+      router.replace(`/explore?q=${q}`);
       const decodedQ = decodeURIComponent(q);
       const timer = setTimeout(() => {
         proceedWithSubmit(false, decodedQ);

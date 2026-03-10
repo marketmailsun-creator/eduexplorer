@@ -193,7 +193,7 @@ export function AudioPlayerSection({ audioContent, queryId }: AudioPlayerSection
         </CardHeader>
         <CardContent className="py-8 text-center space-y-4">
           <p className="text-sm text-muted-foreground">
-            Audio narration not available
+            Listen to summaries on the go
           </p>
           {queryId && (
             <Button

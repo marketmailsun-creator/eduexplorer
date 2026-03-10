@@ -126,9 +126,25 @@ export default async function ResultsPage({
 
   const quiz = hasQuiz ? quizData.quiz : null;
 
-  // Get clean text for display
+  // Raw markdown text — keep ## headings intact so renderArticleWithHeadings() works
   const rawText = article?.text || (query.researchData as any)?.rawData?.content || '';
-  const cleanText = formatForDisplay(rawText);
+  // For sharing (WhatsApp, PDF) we strip markdown formatting
+  const shareableText = formatForDisplay(rawText);
+
+  // Extract citation URLs stored by research service
+  const sources: string[] = Array.isArray((query.researchData as any)?.rawData?.citations)
+    ? (query.researchData as any).rawData.citations
+    : [];
+
+  // Friendly label for the complexity level displayed in the header
+  const LEVEL_LABELS: Record<string, string> = {
+    elementary: 'Elementary School',
+    'middle-school': 'Middle School',
+    'high-school': 'High School',
+    college: 'College',
+    advanced: 'Advanced / Research',
+  };
+  const levelLabel = LEVEL_LABELS[query.complexityLevel ?? ''] ?? (query.complexityLevel || 'College');
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -149,7 +165,7 @@ export default async function ResultsPage({
               {query.queryText}
             </h1>
             <p className="text-xs sm:text-sm text-purple-200 mt-1">
-              Level: {query.complexityLevel || 'college'}
+              Level: {levelLabel}
             </p>
           </div>
 
@@ -182,7 +198,7 @@ export default async function ResultsPage({
                 <ShareButton queryId={query.id} title={query.queryText} />
                 <WhatsAppShareButton
                   topic={query.queryText}
-                  summary={cleanText}
+                  summary={shareableText}
                   queryId={query.id}
                 />
               </>
@@ -197,7 +213,8 @@ export default async function ResultsPage({
         <div className="max-w-7xl mx-auto">
           <InteractiveResultsView
             query={query}
-            cleanText={cleanText}
+            cleanText={rawText}
+            sources={sources}
             hasAudioContent={hasAudioContent}
             audioContent={audioContent}
             hasPresentationData={hasPresentationData}

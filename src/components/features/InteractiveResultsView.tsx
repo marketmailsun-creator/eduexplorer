@@ -15,11 +15,11 @@ import {
   Volume2,
   ChevronDown,
   ChevronUp,
-  Maximize2,
-  Minimize2,
   Download,
-  Loader2
+  Loader2,
+  Link as LinkIcon,
 } from 'lucide-react';
+import { formatForDisplay } from '@/lib/utils/text-formatter';
 import { AudioPlayerSection } from './AudioPlayerSection';
 import { PresentationViewer } from './PresentationViewer';
 import { FlashcardViewer } from './FlashcardViewer';
@@ -38,6 +38,7 @@ import { GenerateConceptMapButton } from './GenerateConceptMapButton';
 interface InteractiveResultsViewProps {
   query: any;
   cleanText: string;
+  sources?: string[];
   hasAudioContent: boolean;
   audioContent: any;
   hasPresentationData: boolean;
@@ -132,6 +133,7 @@ function renderArticleWithHeadings(text: string) {
 export function InteractiveResultsView({
   query,
   cleanText,
+  sources = [],
   hasAudioContent,
   audioContent,
   hasPresentationData,
@@ -248,7 +250,7 @@ export function InteractiveResultsView({
       doc.setTextColor(0);
       doc.setFont('helvetica', 'normal');
       
-      const text = cleanText || 'Content not available';
+      const text = formatForDisplay(cleanText) || 'Content not available';
       const lines = doc.splitTextToSize(text, maxWidth);
       
       lines.forEach((line: string) => {
@@ -304,21 +306,9 @@ export function InteractiveResultsView({
   };
 
   // Size toggle helpers
-  const toggleSize = (currentSize: CardSize, setter: (size: CardSize) => void) => {
-    if (currentSize === 'normal') setter('maximized');
-    else if (currentSize === 'maximized') setter('normal');
-  };
-
   const toggleMinimize = (currentSize: CardSize, setter: (size: CardSize) => void) => {
     if (currentSize === 'minimized') setter('normal');
     else setter('minimized');
-  };
-
-  // Get card height class
-  const getCardClass = (size: CardSize, defaultClass: string = '') => {
-    if (size === 'minimized') return '';
-    if (size === 'maximized') return 'lg:col-span-2 h-[80vh]';
-    return defaultClass;
   };
 
   return (
@@ -375,9 +365,33 @@ export function InteractiveResultsView({
           {explanationSize !== 'minimized' && (
             <CardContent className={`overflow-auto ${explanationSize === 'maximized' ? 'h-[calc(80vh-4rem)]' : 'max-h-[400px]'}`}>
               {cleanText ? (
-                <div className="prose prose-sm max-w-none">
-                  {renderArticleWithHeadings(cleanText)}
-                </div>
+                <>
+                  <div className="prose prose-sm max-w-none">
+                    {renderArticleWithHeadings(cleanText)}
+                  </div>
+                  {sources.length > 0 && (
+                    <div className="mt-6 pt-4 border-t border-gray-200">
+                      <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2 flex items-center gap-1">
+                        <LinkIcon className="h-3.5 w-3.5" />
+                        Sources
+                      </h3>
+                      <ul className="space-y-1">
+                        {sources.map((url, i) => (
+                          <li key={i} className="text-xs">
+                            <a
+                              href={url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-blue-600 hover:underline break-all"
+                            >
+                              {url}
+                            </a>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </>
               ) : autoQuizMode ? (
                 <div className="text-center py-10 bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100 rounded-xl space-y-3">
                   <FileText className="h-14 w-14 mx-auto text-blue-400" />
@@ -639,7 +653,7 @@ export function InteractiveResultsView({
               ) : (
                 <div className="text-center py-8 bg-gradient-to-br from-purple-50 to-violet-50 border border-purple-100 rounded-xl">
                   <Volume2 className="h-12 w-12 mx-auto mb-3 text-purple-400" />
-                  <p className="text-gray-600 mb-4 text-sm">Audio narration not available</p>
+                  <p className="text-gray-600 mb-4 text-sm">Generate Audio to Listen on the go</p>
                   {isOwner ? (
                     <GenerateAudioButton queryId={queryId} />
                   ) : (
