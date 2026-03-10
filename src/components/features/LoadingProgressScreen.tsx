@@ -10,6 +10,7 @@ import { useEffect, useState } from 'react';
 interface LoadingProgressScreenProps {
   query: string;
   hasMedia?: boolean;
+  isQuizMode?: boolean;
 }
 
 const STEPS = [
@@ -47,6 +48,33 @@ const STEPS = [
   },
 ];
 
+const QUIZ_STEPS = [
+  {
+    emoji: '🔍',
+    label: 'Researching your topic',
+    sub: 'Scanning trusted sources for relevant content',
+    duration: 5000,
+    colorFrom: '#3b82f6',
+    colorTo: '#06b6d4',
+  },
+  {
+    emoji: '🧠',
+    label: 'Generating your quiz',
+    sub: 'Creating challenging questions to test your knowledge',
+    duration: 8000,
+    colorFrom: '#8b5cf6',
+    colorTo: '#ec4899',
+  },
+  {
+    emoji: '✅',
+    label: 'Quiz almost ready',
+    sub: 'Reviewing and finalising your questions',
+    duration: 99999,
+    colorFrom: '#10b981',
+    colorTo: '#059669',
+  },
+];
+
 const FUN_FACTS = [
   '💡 Your brain processes visuals 60,000× faster than text.',
   '📚 30 mins of active reading/day = ~20 books a year.',
@@ -58,7 +86,8 @@ const FUN_FACTS = [
   '😴 Sleep consolidates learning — review before bed works!',
 ];
 
-export function LoadingProgressScreen({ query, hasMedia = false }: LoadingProgressScreenProps) {
+export function LoadingProgressScreen({ query, hasMedia = false, isQuizMode = false }: LoadingProgressScreenProps) {
+  const activeSteps = isQuizMode ? QUIZ_STEPS : STEPS;
   const [step, setStep] = useState(0);
   const [progress, setProgress] = useState(2);
   const [factIdx, setFactIdx] = useState(0);
@@ -69,18 +98,19 @@ export function LoadingProgressScreen({ query, hasMedia = false }: LoadingProgre
   useEffect(() => {
     const timers: NodeJS.Timeout[] = [];
     let accumulated = 0;
-    STEPS.forEach((s, i) => {
-      if (i === STEPS.length - 1) return;
+    activeSteps.forEach((s, i) => {
+      if (i === activeSteps.length - 1) return;
       accumulated += s.duration;
       timers.push(setTimeout(() => setStep(i + 1), accumulated));
     });
     return () => timers.forEach(clearTimeout);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Smooth progress bar animation
   useEffect(() => {
-    const totalMs = STEPS.slice(0, 3).reduce((a, s) => a + s.duration, 0);
-    const elapsedMs = STEPS.slice(0, step).reduce((a, s) => a + s.duration, 0);
+    const totalMs = activeSteps.slice(0, activeSteps.length - 1).reduce((a, s) => a + s.duration, 0);
+    const elapsedMs = activeSteps.slice(0, step).reduce((a, s) => a + s.duration, 0);
     const target = Math.min((elapsedMs / totalMs) * 90 + 4, 92);
     let raf: number;
     const tick = () => {
@@ -113,7 +143,7 @@ export function LoadingProgressScreen({ query, hasMedia = false }: LoadingProgre
     return () => clearInterval(i);
   }, []);
 
-  const current = STEPS[step];
+  const current = activeSteps[step];
   const grad = `linear-gradient(135deg, ${current.colorFrom}, ${current.colorTo})`;
   const truncatedQuery = query.length > 55 ? query.slice(0, 55) + '…' : query;
 
@@ -210,7 +240,7 @@ export function LoadingProgressScreen({ query, hasMedia = false }: LoadingProgre
 
           {/* Step bubbles */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0, marginBottom: 24 }}>
-            {STEPS.map((s, idx) => (
+            {activeSteps.map((s, idx) => (
               <div key={idx} style={{ display: 'flex', alignItems: 'center' }}>
                 <div style={{
                   width: 32, height: 32, borderRadius: '50%',
@@ -229,7 +259,7 @@ export function LoadingProgressScreen({ query, hasMedia = false }: LoadingProgre
                 }}>
                   {idx < step ? '✓' : idx + 1}
                 </div>
-                {idx < STEPS.length - 1 && (
+                {idx < activeSteps.length - 1 && (
                   <div style={{
                     width: 28, height: 2, borderRadius: 99,
                     background: idx < step ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.1)',
@@ -258,8 +288,8 @@ export function LoadingProgressScreen({ query, hasMedia = false }: LoadingProgre
         </div>
 
         {/* Mini step labels below card */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 8, marginTop: 12 }}>
-          {STEPS.map((s, idx) => (
+        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${activeSteps.length}, 1fr)`, gap: 8, marginTop: 12 }}>
+          {activeSteps.map((s, idx) => (
             <div key={idx} style={{
               background: idx === step
                 ? 'rgba(255,255,255,0.12)'

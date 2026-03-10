@@ -9,6 +9,25 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 export const fetchCache = 'force-no-store';
 
+// ── Avatar helpers (server-renderable, no hooks) ──────────────
+function getInitials(name?: string | null): string {
+  if (!name) return '?';
+  const parts = name.trim().split(' ');
+  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+  return name.slice(0, 2).toUpperCase();
+}
+
+const AVATAR_COLORS = [
+  'bg-blue-500', 'bg-purple-500', 'bg-pink-500', 'bg-red-500',
+  'bg-orange-500', 'bg-green-500', 'bg-teal-500', 'bg-indigo-500',
+];
+
+function getAvatarColor(name?: string | null): string {
+  if (!name) return AVATAR_COLORS[0];
+  const hash = name.split('').reduce((acc, char) => char.charCodeAt(0) + ((acc << 5) - acc), 0);
+  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
+}
+
 interface SearchParams {
   tab?: string;
 }
@@ -84,7 +103,7 @@ function Podium({
   scoreLabel,
   scoreColor,
 }: {
-  entries: Array<{ name?: string | null; image?: string | null; score: number }>;
+  entries: Array<{ name?: string | null; score: number }>;
   scoreLabel: string;
   scoreColor: string;
 }) {
@@ -94,11 +113,9 @@ function Podium({
     <div className="flex items-end justify-center gap-4 sm:gap-8 py-6 px-4 bg-white rounded-2xl border border-gray-100 shadow-sm mb-5">
       {/* 2nd place */}
       <div className="flex flex-col items-center gap-2">
-        <img
-          src={second.image || '/default-avatar.svg'}
-          alt={second.name || 'User'}
-          className="w-14 h-14 rounded-full border-4 border-gray-300 shadow-md object-cover"
-        />
+        <div className={`w-14 h-14 rounded-full border-4 border-gray-300 shadow-md flex items-center justify-center text-white font-bold text-lg ${getAvatarColor(second.name)}`}>
+          {getInitials(second.name)}
+        </div>
         <div className="text-center">
           <p className="text-xs font-semibold text-gray-700 truncate max-w-[80px]">{second.name || 'Anonymous'}</p>
           <p className={`text-sm font-bold ${scoreColor}`}>{second.score}</p>
@@ -112,11 +129,9 @@ function Podium({
       {/* 1st place — taller */}
       <div className="flex flex-col items-center gap-2 -mb-2">
         <span className="text-2xl mb-1">👑</span>
-        <img
-          src={first.image || '/default-avatar.svg'}
-          alt={first.name || 'User'}
-          className="w-16 h-16 rounded-full border-4 border-yellow-400 shadow-lg object-cover"
-        />
+        <div className={`w-16 h-16 rounded-full border-4 border-yellow-400 shadow-lg flex items-center justify-center text-white font-bold text-xl ${getAvatarColor(first.name)}`}>
+          {getInitials(first.name)}
+        </div>
         <div className="text-center">
           <p className="text-xs font-bold text-gray-900 truncate max-w-[80px]">{first.name || 'Anonymous'}</p>
           <p className={`text-sm font-bold ${scoreColor}`}>{first.score}</p>
@@ -129,11 +144,9 @@ function Podium({
 
       {/* 3rd place */}
       <div className="flex flex-col items-center gap-2">
-        <img
-          src={third.image || '/default-avatar.svg'}
-          alt={third.name || 'User'}
-          className="w-14 h-14 rounded-full border-4 border-orange-400 shadow-md object-cover"
-        />
+        <div className={`w-14 h-14 rounded-full border-4 border-orange-400 shadow-md flex items-center justify-center text-white font-bold text-lg ${getAvatarColor(third.name)}`}>
+          {getInitials(third.name)}
+        </div>
         <div className="text-center">
           <p className="text-xs font-semibold text-gray-700 truncate max-w-[80px]">{third.name || 'Anonymous'}</p>
           <p className={`text-sm font-bold ${scoreColor}`}>{third.score}</p>
@@ -160,7 +173,7 @@ async function QuizLeaderboardTab({ currentUserId }: { currentUserId: string }) 
   const userIds = topUsers.map((u) => u.userId);
   const users = await prisma.user.findMany({
     where: { id: { in: userIds } },
-    select: { id: true, name: true, image: true },
+    select: { id: true, name: true },
   });
   const userMap = new Map(users.map((u) => [u.id, u]));
 
@@ -184,7 +197,6 @@ async function QuizLeaderboardTab({ currentUserId }: { currentUserId: string }) 
 
   const podiumEntries = leaderboard.slice(0, 3).map(e => ({
     name: e.user?.name,
-    image: e.user?.image,
     score: e.totalScore,
   }));
 
@@ -222,11 +234,9 @@ async function QuizLeaderboardTab({ currentUserId }: { currentUserId: string }) 
               }`}
             >
               <div className="w-10 flex justify-center flex-shrink-0">{getRankIcon(entry.rank)}</div>
-              <img
-                src={entry.user?.image || '/default-avatar.svg'}
-                alt={entry.user?.name || 'User'}
-                className="w-9 h-9 rounded-full object-cover flex-shrink-0"
-              />
+              <div className={`w-9 h-9 rounded-full flex-shrink-0 flex items-center justify-center text-white font-semibold text-sm ${getAvatarColor(entry.user?.name)}`}>
+                {getInitials(entry.user?.name)}
+              </div>
               <div className="flex-1 min-w-0">
                 <p className="font-semibold text-sm text-gray-900 truncate">
                   {entry.user?.name || 'Anonymous'}
@@ -264,7 +274,6 @@ async function XPLeaderboardTab({ currentUserId }: { currentUserId: string }) {
 
   const podiumEntries = leaderboard.slice(0, 3).map(e => ({
     name: e.name,
-    image: e.image,
     score: e.totalXP,
   }));
 
@@ -303,11 +312,9 @@ async function XPLeaderboardTab({ currentUserId }: { currentUserId: string }) {
               }`}
             >
               <div className="w-10 flex justify-center flex-shrink-0">{getRankIcon(index + 1)}</div>
-              <img
-                src={entry.image || '/default-avatar.svg'}
-                alt={entry.name || 'User'}
-                className="w-9 h-9 rounded-full object-cover flex-shrink-0"
-              />
+              <div className={`w-9 h-9 rounded-full flex-shrink-0 flex items-center justify-center text-white font-semibold text-sm ${getAvatarColor(entry.name)}`}>
+                {getInitials(entry.name)}
+              </div>
               <div className="flex-1 min-w-0">
                 <p className="font-semibold text-sm text-gray-900 truncate">
                   {entry.name || 'Anonymous'}

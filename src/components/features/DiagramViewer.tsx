@@ -20,28 +20,46 @@ interface DiagramViewerProps {
 // Module-level counter for unique element IDs (avoids Date.now() collisions under rapid navigation)
 let renderCounter = 0;
 
-// Singleton module load — loads mermaid once
+// Singleton module load — initialises mermaid once then caches the instance
 let mermaidMod: any = null;
 async function loadMermaid() {
   if (!mermaidMod) {
     const mod = await import('mermaid');
     mermaidMod = mod.default;
+    // Initialise exactly once; re-calling initialize() on every render
+    // triggers a DOM re-scan in mermaid v11 and worsens orphan elements.
+    mermaidMod.initialize({
+      startOnLoad: false,
+      theme: 'default',
+      securityLevel: 'loose',
+      fontSize: 14,
+      flowchart: { useMaxWidth: true, htmlLabels: true },
+      mindmap: { useMaxWidth: true },
+    });
   }
   return mermaidMod;
 }
 
-// Always reinit before render to clear stale state from previous diagrams
+// Returns the cached, already-initialised mermaid instance
 async function getMermaid() {
-  const mermaid = await loadMermaid();
-  mermaid.initialize({
-    startOnLoad: false,
-    theme: 'default',
-    securityLevel: 'loose',
-    fontSize: 14,
-    flowchart: { useMaxWidth: true, htmlLabels: true },
-    mindmap: { useMaxWidth: true },
+  return loadMermaid();
+}
+
+/**
+ * Remove any DOM elements that mermaid v11 may have appended to document.body
+ * during rendering (the temporary sandbox div + any error message elements).
+ */
+function cleanupMermaidOrphans(elementId: string) {
+  if (typeof document === 'undefined') return;
+  // Mermaid creates a sandbox element: div#d{elementId}
+  document.getElementById(`d${elementId}`)?.remove();
+  // Also sweep any lingering mermaid error/render artefacts on the body
+  document.querySelectorAll(
+    `#${elementId}, [id^="mermaid-"], .mermaid-error`
+  ).forEach(el => {
+    // Only remove if it's a direct child of body (i.e. an orphan, not inside our container)
+    if (el.parentElement === document.body) el.remove();
   });
-  return mermaid;
 }
 
 export function DiagramViewer({ diagrams }: DiagramViewerProps) {
@@ -62,15 +80,20 @@ export function DiagramViewer({ diagrams }: DiagramViewerProps) {
     if (!diagram.mermaidCode || svgs.has(diagram.id) || errorIds.has(diagram.id)) return;
 
     setLoadingIds(prev => new Set(prev).add(diagram.id));
+    // Declare elementId before try so it is accessible in finally for cleanup
+    const elementId = `mermaid-diagram-${++renderCounter}`;
+    cleanupMermaidOrphans(elementId);
     try {
       const mermaid = await getMermaid();
-      // Use module-level counter for stable unique IDs
-      const elementId = `mermaid-diagram-${++renderCounter}`;
-      // Belt-and-suspenders: sanitize parens inside [...] labels client-side too
+      // Belt-and-suspenders: sanitize special chars inside [...] labels client-side too
+      // Use quoted labels ["text"] which allow any content including () and {}
       let codeToRender = diagram.mermaidCode;
       codeToRender = codeToRender.replace(/\[([^\]]*)\]/g, (_match: string, inner: string) => {
-        const cleaned = inner.replace(/\(/g, '{').replace(/\)/g, '}');
-        return `[${cleaned}]`;
+        const escaped = inner.replace(/"/g, "'").replace(/`/g, "'");
+        if (/[(){}|<>]/.test(escaped)) {
+          return `["${escaped}"]`;
+        }
+        return `[${escaped}]`;
       });
       const { svg } = await mermaid.render(elementId, codeToRender);
       setSvgs(prev => new Map(prev).set(diagram.id, svg));
@@ -78,6 +101,7 @@ export function DiagramViewer({ diagrams }: DiagramViewerProps) {
       console.error('Mermaid render error:', diagram.title, err);
       setErrorIds(prev => new Set(prev).add(diagram.id));
     } finally {
+      cleanupMermaidOrphans(elementId);
       setLoadingIds(prev => {
         const next = new Set(prev);
         next.delete(diagram.id);

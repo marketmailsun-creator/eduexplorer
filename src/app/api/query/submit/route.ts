@@ -2,11 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { processResearchQuery } from '@/lib/services/research.service';
 import { generateContentForQuery } from '@/lib/services/content.service';
+import { generateAndSaveQuizForQuery } from '@/lib/services/practice-questions-generator';
 import { moderateContent, getModerationErrorMessage, quickModerationCheck } from '@/lib/services/content-moderation.service';
 import { analyzeImageWithClaude, extractTextFromPDF, analyzeMultipleImages } from '@/lib/services/media-analysis.service';
 import { prisma } from '@/lib/db/prisma';
-import { z } from 'zod';
-import { ca } from 'zod/v4/locales';
 import { awardXP } from '@/lib/services/xp.service';
 import { updateStreak } from '@/lib/services/streak.service';
 import { checkAndUnlockAchievements } from '@/lib/services/achievement.service';
@@ -19,8 +18,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // Read user from DB (not JWT) — JWT plan can be stale after subscription
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { age: true, dateOfBirth: true, plan: true },
+    });
+    const userPlan = (user?.plan as 'free' | 'pro') || 'free';
+
     // Check daily lesson limit for free users
-    const userPlan = (session.user as { plan?: string }).plan as 'free' | 'pro' ?? 'free';
     const lessonCheck = await checkDailyLessonAllowed(session.user.id, userPlan);
     if (!lessonCheck.allowed) {
       return NextResponse.json(
@@ -40,11 +45,13 @@ export async function POST(req: NextRequest) {
     let audioFile: File | null = null;
 
     const contentType = req.headers.get('content-type') || '';
+    let autoQuizFlag = false;
 
     if (contentType.includes('multipart/form-data')) {
       const formData = await req.formData();
       query = (formData.get('query') as string) || '';
       learningLevel = (formData.get('learningLevel') as string) || 'college';
+      autoQuizFlag = formData.get('autoQuiz') === 'true';
       files = formData.getAll('files') as File[];
       audioFile = (formData.get('audio') as File) || null;
     } else {
@@ -52,6 +59,7 @@ export async function POST(req: NextRequest) {
       const body = await req.json();
       query = body.query || '';
       learningLevel = body.learningLevel || 'college';
+      autoQuizFlag = body.autoQuiz === true;
     }
 
     // Validate
@@ -171,12 +179,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No input provided.' }, { status: 400 });
     }
 
-    // Get user's age for age-appropriate filtering
-    const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      select: { age: true, dateOfBirth: true },
-    });
-
+    // user was already fetched at the top of the handler (includes age, dateOfBirth, plan)
     const userAge: number | undefined = user?.age ?? undefined;
     console.log('👤 User age:', userAge ?? 'unknown');
 
@@ -224,7 +227,13 @@ export async function POST(req: NextRequest) {
       learningLevel,
     });
 
-    await generateContentForQuery(result.queryId);
+    if (autoQuizFlag) {
+      // Pre-generate quiz server-side so results page loads with quiz already available.
+      // Eliminates client-side router.refresh() call in InteractiveResultsView.
+      await generateAndSaveQuizForQuery(result.queryId, enrichedQuery, learningLevel);
+    } else {
+      await generateContentForQuery(result.queryId);
+    }
 
     // Gamification: increment daily counter, award XP, update streak, check achievements
     // Run fire-and-forget so errors don't block the response

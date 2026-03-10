@@ -122,7 +122,7 @@ function UpgradePageContent() {
   ];
 
   const features = [
-    'Unlimited AI lessons daily',
+    '15 AI lessons/day (3× Free)',
     'Unlimited quizzes & flashcards',
     'Audio narration (on-demand)',
     'Presentation generation',

@@ -413,8 +413,8 @@ export default function ProfilePage() {
               image={currentImage}
               onUploaded={handleAvatarUploaded}
             />
-            <div className="flex-1 pb-2">
-              <h2 className="text-xl font-extrabold text-gray-900 leading-tight">
+            <div className="flex-1 min-w-0 pb-2">
+              <h2 className="text-xl font-extrabold text-gray-900 leading-tight truncate">
                 {user?.name ?? 'Learner'}
               </h2>
               <div className="flex items-center gap-1.5 mt-1">

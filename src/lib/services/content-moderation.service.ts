@@ -1,9 +1,10 @@
-import Anthropic from '@anthropic-ai/sdk';
+import { GoogleGenerativeAI } from '@google/generative-ai';
+import { incrementUsageCounter } from '../db/redis';
 
-const client = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
-const MODEL = 'claude-sonnet-4-5-20250929';
+const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
+const genAI = GOOGLE_API_KEY ? new GoogleGenerativeAI(GOOGLE_API_KEY) : null;
+const MODEL = 'gemini-2.5-flash';
+
 interface ModerationResult {
   isAppropriate: boolean;
   reason?: string;
@@ -19,17 +20,21 @@ export async function moderateContent(
   query: string,
   userAge?: number
 ): Promise<ModerationResult> {
+  if (!genAI) {
+    console.warn('⚠️ GOOGLE_API_KEY missing — skipping AI moderation (fail open)');
+    return { isAppropriate: true };
+  }
+
   try {
-    console.log('🛡️ Moderating content:', query.substring(0, 50) + '...');
-    
-    const ageContext = userAge && userAge < 18 
+    console.log('🛡️ Moderating content (Gemini):', query.substring(0, 50) + '...');
+
+    const ageContext = userAge && userAge < 18
       ? `The user is ${userAge} years old (minor). Apply strict content filtering.`
       : 'The user is an adult, but still filter inappropriate content.';
 
-    const message = await client.messages.create({
+    const model = genAI.getGenerativeModel({
       model: MODEL,
-      max_tokens: 500,
-      system: `You are a content moderation system for an educational platform. Your job is to determine if a user's query is appropriate for educational content generation.
+      systemInstruction: `You are a content moderation system for an educational platform. Your job is to determine if a user's query is appropriate for educational content generation.
 
 ${ageContext}
 
@@ -54,43 +59,35 @@ ALLOW queries about:
 - Career and professional development
 - General knowledge topics
 
-Respond in JSON format:
+Respond in JSON format only (no markdown, no explanation outside JSON):
 {
   "isAppropriate": true/false,
   "reason": "Brief explanation",
   "category": "sexual/violent/illegal/hate/drugs/profanity/safe",
   "severity": "low/medium/high"
 }`,
-      messages: [
-        {
-          role: 'user',
-          content: `Moderate this query: "${query}"`,
-        },
-      ],
     });
 
-    const responseText = message.content[0].type === 'text' 
-      ? message.content[0].text 
-      : '';
+    await incrementUsageCounter('gemini');
+    const result = await model.generateContent(`Moderate this query: "${query}"`);
+    const responseText = result.response.text();
 
-    // Parse JSON response
     const jsonMatch = responseText.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
       console.error('❌ Invalid moderation response format');
-      // Fail open - allow if we can't parse (better than blocking everything)
       return { isAppropriate: true };
     }
 
-    const result = JSON.parse(jsonMatch[0]) as ModerationResult;
+    const parsed = JSON.parse(jsonMatch[0]) as ModerationResult;
 
-    if (!result.isAppropriate) {
-      console.log('🚫 Content blocked:', result.category, '- Severity:', result.severity);
-      console.log('   Reason:', result.reason);
+    if (!parsed.isAppropriate) {
+      console.log('🚫 Content blocked:', parsed.category, '- Severity:', parsed.severity);
+      console.log('   Reason:', parsed.reason);
     } else {
       console.log('✅ Content approved');
     }
 
-    return result;
+    return parsed;
   } catch (error) {
     console.error('❌ Moderation error:', error);
     // Fail open - allow content if moderation fails
@@ -111,23 +108,23 @@ export function getModerationErrorMessage(
     sexual: isMinor
       ? "This content is not appropriate for users under 18. Please ask about educational topics suitable for your age."
       : "This content contains adult themes that we don't generate educational materials for. Please try a different topic.",
-    
+
     violent: "This content contains violent or graphic themes. Please ask about educational topics that don't involve violence or harm.",
-    
+
     illegal: "We cannot provide information about illegal activities. Please ask about legal and educational topics.",
-    
+
     hate: "This query contains discriminatory or hateful language. Please rephrase your question respectfully.",
-    
+
     drugs: isMinor
       ? "Content about substances is not appropriate for users under 18. Please ask about other educational topics."
       : "We provide general health education, but cannot assist with drug-related queries. Try asking about health science instead.",
-    
+
     profanity: "Please rephrase your question without profanity so we can help you learn.",
-    
+
     self_harm: "If you're struggling with difficult thoughts, please reach out to a counselor or crisis helpline. We're here for educational support on other topics.",
   };
 
-  return messages[result.category || ''] || result.reason || 
+  return messages[result.category || ''] || result.reason ||
     "This query doesn't seem appropriate for our educational platform. Please try asking about a different topic.";
 }
 
@@ -137,7 +134,7 @@ export function getModerationErrorMessage(
  */
 export function quickModerationCheck(query: string): boolean {
   const lowercaseQuery = query.toLowerCase();
-  
+
   // Common inappropriate keywords (basic list)
   const blockedKeywords = [
     // Sexual content

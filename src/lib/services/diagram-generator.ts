@@ -15,20 +15,19 @@ export interface Diagram {
 
 /**
  * Sanitize mermaid code to prevent parser failures.
- * Removes parentheses from inside rectangular bracket labels [...]
- * since Mermaid interprets () inside nodes as shape markers.
- * Also strips quotes that can break string parsing.
+ * Wraps node labels containing special characters in double-quoted strings.
+ * Mermaid supports ["quoted label"] which allows any text content including
+ * () and {} that would otherwise be interpreted as shape tokens.
  */
 function sanitizeMermaidCode(code: string): string {
   if (!code) return code;
-  // Replace ( and ) inside [...] labels with { and }
+  // Wrap labels containing special mermaid characters in double-quoted strings.
   let result = code.replace(/\[([^\]]*)\]/g, (_match: string, inner: string) => {
-    const cleaned = inner
-      .replace(/\(/g, '{')
-      .replace(/\)/g, '}')
-      .replace(/"/g, "'")
-      .replace(/`/g, "'");
-    return `[${cleaned}]`;
+    const escaped = inner.replace(/"/g, "'").replace(/`/g, "'");
+    if (/[(){}|<>]/.test(escaped)) {
+      return `["${escaped}"]`;
+    }
+    return `[${escaped}]`;
   });
   // Also clean parenthetical node labels without brackets: node(text) where text has nested parens
   result = result.replace(/\(([^)]*)\)/g, (match: string, inner: string) => {

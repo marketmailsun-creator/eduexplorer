@@ -51,7 +51,9 @@ export function Footer() {
         </div>
 
         <div className="border-t border-gray-800 pt-4 text-xs text-gray-600">
-          <p>&copy; {currentYear} EduExplorer. All rights reserved. Operated by Usha Sree, India.</p>
+          <p>
+            &copy; {currentYear} EduExplorer. All rights reserved. EduExplorer is an independent educational platform currently operated by its founders. Formal company registration is in progress in India.
+          </p>
         </div>
       </div>
     </footer>

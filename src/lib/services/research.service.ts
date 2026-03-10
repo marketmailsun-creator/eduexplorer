@@ -1,4 +1,4 @@
-import OpenAI from 'openai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import { prisma } from '../db/prisma';
 import { formatForDisplay } from '../utils/text-cleaning-utils';
 import { getCached, setCache, incrementUsageCounter, sendQuotaAlertOnce } from '../db/redis';
@@ -12,25 +12,16 @@ interface ResearchResult {
   fromCache?: boolean;
 }
 
-// Initialize Perplexity client
-const perplexity = new OpenAI({
-  apiKey: process.env.PERPLEXITY_API_KEY!,
-  baseURL: 'https://api.perplexity.ai',
-});
+const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
+const genAI = GOOGLE_API_KEY ? new GoogleGenerativeAI(GOOGLE_API_KEY) : null;
+const MODEL = 'gemini-2.5-flash';
 
-console.log('🔑 Research Service - Perplexity API:', process.env.PERPLEXITY_API_KEY ? '✅ SET' : '❌ MISSING');
-
-// Model fallback chain: cheapest/fastest first, escalate on failure
-const PERPLEXITY_MODELS = [
-  'sonar',
-  'sonar-pro',
-  'llama-3.1-sonar-large-128k-online',
-] as const;
+console.log('🔑 Research Service - Google API:', GOOGLE_API_KEY ? '✅ SET' : '❌ MISSING');
 
 function getFriendlyErrorMessage(error: unknown): string {
   const err = error as { status?: number; code?: string; message?: string };
   const status = err?.status;
-  if (status === 401) {
+  if (status === 401 || status === 403) {
     return 'Research service authentication failed. Please try again later or contact support.';
   }
   if (status === 429) {
@@ -89,61 +80,53 @@ export async function processResearchQuery(params: {
   console.log('✓ Query created:', query.id);
 
   try {
-    console.log('🔍 Perplexity research started:', queryText);
+    console.log('🔍 Gemini + Google Search research started:', queryText);
     console.log('  - Level:', learningLevel);
 
-    // Try each model in order — use first successful response
-    let response: Awaited<ReturnType<typeof perplexity.chat.completions.create>> | null = null;
-    let lastError: unknown = null;
-
-    for (const model of PERPLEXITY_MODELS) {
-      try {
-        console.log(`🔍 Trying Perplexity model: ${model}`);
-        await incrementUsageCounter('perplexity');
-        response = await perplexity.chat.completions.create({
-          model,
-          messages: [
-            {
-              role: 'system',
-              content: getSystemPrompt(learningLevel),
-            },
-            {
-              role: 'user',
-              content: formatForDisplay(queryText),
-            },
-          ],
-          temperature: 0.2,
-          max_tokens: 4000,
-        });
-        console.log(`✅ Model ${model} succeeded`);
-        break;
-      } catch (modelError) {
-        console.error(`❌ Model ${model} failed:`, modelError);
-        lastError = modelError;
-      }
+    if (!genAI) {
+      await prisma.query.delete({ where: { id: query.id } });
+      throw new Error('Research service is not configured. Please contact support.');
     }
 
-    if (!response) {
-      // All models failed — delete the query record so it doesn't pollute history
+    const model = genAI.getGenerativeModel({
+      model: MODEL,
+      tools: [{ googleSearch: {} } as any],
+      systemInstruction: getSystemPrompt(learningLevel),
+    });
+
+    let content: string;
+    let sources: { title: string; url: string; snippet: string }[];
+
+    try {
+      console.log('🔍 Calling Gemini with Google Search grounding...');
+      await incrementUsageCounter('gemini');
+      const result = await model.generateContent(formatForDisplay(queryText));
+      const response = result.response;
+      content = response.text();
+
+      // Extract citations from grounding metadata
+      const groundingMetadata = (response as any).candidates?.[0]?.groundingMetadata;
+      const groundingChunks: any[] = groundingMetadata?.groundingChunks ?? [];
+      sources = groundingChunks
+        .filter((chunk: any) => chunk?.web?.uri)
+        .map((chunk: any, idx: number) => ({
+          title: chunk.web.title || `Source ${idx + 1}`,
+          url: chunk.web.uri,
+          snippet: chunk.web.uri,
+        }));
+
+      console.log('✅ Gemini research completed:');
+      console.log('  - Content length:', content.length, 'characters');
+      console.log('  - Sources:', sources.length);
+    } catch (apiError: unknown) {
+      // All research failed — delete the query record so it doesn't pollute history
       await prisma.query.delete({ where: { id: query.id } });
-      const errMsg = getFriendlyErrorMessage(lastError);
-      await sendQuotaAlertOnce('perplexity', `All Perplexity models failed.\nError: ${errMsg}\nQuery: ${queryText}`);
+      const errMsg = getFriendlyErrorMessage(apiError);
+      await sendQuotaAlertOnce('gemini', `Gemini research failed.\nError: ${errMsg}\nQuery: ${queryText}`);
       throw new Error(errMsg);
     }
 
-    const content = response.choices[0].message.content || '';
-    const citations = (response as any).citations || [];
     const cleanedContent = formatForDisplay(content);
-    console.log('✅ Perplexity research completed:');
-    console.log('  - Content length:', content.length, 'characters');
-    console.log('  - Citations:', citations.length);
-
-    // Format sources from citations
-    const sources = citations.map((url: string, idx: number) => ({
-      title: `Source ${idx + 1}`,
-      url,
-      snippet: url,
-    }));
 
     // Save research data to database
     await prisma.researchData.create({
@@ -151,8 +134,8 @@ export async function processResearchQuery(params: {
         queryId: query.id,
         rawData: {
           cleanedContent,
-          citations,
-          model: 'perplexity-sonar',
+          citations: sources.map(s => s.url),
+          model: 'gemini-2.5-flash-grounded',
         } as any,
         sources: sources as any,
         summary: cleanedContent.substring(0, 500),
@@ -191,7 +174,7 @@ export async function processResearchQuery(params: {
     await prisma.query.update({
       where: { id: query.id },
       data: { status: 'failed' },
-    }).catch(() => {}); // ignore if query was already deleted by the fallback loop
+    }).catch(() => {}); // ignore if query was already deleted by the inner catch
     throw new Error(getFriendlyErrorMessage(error));
   }
 }
