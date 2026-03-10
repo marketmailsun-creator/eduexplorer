@@ -1,6 +1,5 @@
 import OpenAI from 'openai';
 import { prisma } from '../db/prisma';
-import { formatForDisplay } from '../utils/text-formatter';
 import { incrementUsageCounter, sendQuotaAlertOnce } from '../db/redis';
 
 // Use Groq (OpenAI-compatible API)
@@ -139,13 +138,12 @@ export async function generateContentForQuery(queryId: string) {
     sourceUrls
   );
 
-  const cleanedArticle = formatForDisplay(article);
   const articleContent = await prisma.content.create({
     data: {
       queryId,
       contentType: 'article',
       title: research.query.queryText,
-      data: { text: cleanedArticle },
+      data: { text: article },
     },
   });
 

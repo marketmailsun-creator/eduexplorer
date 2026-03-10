@@ -27,7 +27,7 @@ export function XPRedemptionBanner() {
       <div className="container mx-auto px-4 py-2 flex items-center justify-center gap-3 text-sm font-medium">
         <Zap className="h-4 w-4 flex-shrink-0 fill-white" />
         <span>
-          Earn <strong>100 XP</strong> → Get a{' '}
+          Earn <strong>200 XP</strong> → Get a{' '}
           <strong>₹100 Amazon Voucher!</strong>
         </span>
         <Link
@@ -36,13 +36,13 @@ export function XPRedemptionBanner() {
         >
           Redeem now →
         </Link>
-        <button
+        {/* <button
           onClick={dismiss}
           className="absolute right-4 top-1/2 -translate-y-1/2 p-1 hover:bg-white/20 rounded"
           aria-label="Dismiss"
         >
           <X className="h-4 w-4" />
-        </button>
+        </button> */}
       </div>
     </div>
   );

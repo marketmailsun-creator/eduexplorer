@@ -413,7 +413,7 @@ export default function ProfilePage() {
               image={currentImage}
               onUploaded={handleAvatarUploaded}
             />
-            <div className="flex-1 min-w-0 pb-2">
+            <div className="flex-1 min-w-0 pb-0">
               <h2 className="text-xl font-extrabold text-gray-900 leading-tight truncate">
                 {user?.name ?? 'Learner'}
               </h2>
@@ -560,7 +560,7 @@ export default function ProfilePage() {
         {/* ── Notification Preferences ─────────────────────────── */}
         <NotificationPreferences />
         <DeleteAccountSection hasPassword={user?.hasPassword ?? false} />
-        <ChangePasswordSection hasPassword={user?.hasPassword ?? false} />
+        {/* <ChangePasswordSection hasPassword={user?.hasPassword ?? false} /> */}
 
         {/* ── Quick links ──────────────────────────────────────── */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">

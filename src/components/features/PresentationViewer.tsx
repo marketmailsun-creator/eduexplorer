@@ -122,21 +122,78 @@ export function PresentationViewer({ presentationData, autoPlay = false, queryId
 
   const slide = slides[currentSlide];
 
-  return (
-    <div className={`${isFullscreen ? 'fixed inset-0 z-50 bg-gray-900 p-8' : 'relative'}`}>
-      {/* Back to Results button — fullscreen only */}
-      {isFullscreen && queryId && (
-        <div className="absolute top-4 left-4 z-10">
-          <button
-            onClick={() => router.push(`/results/${queryId}`)}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/20 hover:bg-white/30 text-white text-sm font-medium transition-colors"
-          >
-            <ChevronLeft className="h-4 w-4" />
-            Back to Results
-          </button>
-        </div>
-      )}
+  // ── Fullscreen layout ──────────────────────────────────────────────────────
+  if (isFullscreen) {
+    return (
+      <div className="fixed inset-0 z-[100] bg-gray-900 flex flex-col overflow-hidden">
+        {/* Top bar: Back button */}
+        {queryId && (
+          <div className="flex-shrink-0 flex items-center px-4 pt-4 pb-2">
+            <button
+              onClick={() => router.push(`/results/${queryId}`)}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/20 hover:bg-white/30 text-white text-sm font-medium transition-colors"
+            >
+              <ChevronLeft className="h-4 w-4" />
+              Back to Results
+            </button>
+          </div>
+        )}
 
+        {/* Slide — fills remaining height */}
+        <div className="flex-1 min-h-0 px-4">
+          <div className="relative h-full bg-white rounded-lg overflow-hidden shadow-2xl">
+            <SlideRenderer slide={slide} />
+            <div className="absolute bottom-2 right-2 bg-black/50 text-white px-2 py-1 rounded text-xs font-medium">
+              {currentSlide + 1} / {totalSlides}
+            </div>
+          </div>
+        </div>
+
+        {/* Controls — pinned at bottom */}
+        <div className="flex-shrink-0 px-4 pb-4 pt-2 flex items-center justify-between gap-2 flex-wrap">
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            <Button size="sm" variant="outline" onClick={prevSlide} disabled={currentSlide === 0} className="h-8 sm:h-9 bg-white/10 border-white/20 text-white hover:bg-white/20 hover:text-white">
+              <ChevronLeft className="h-3 w-3 sm:h-4 sm:w-4" />
+              <span className="hidden sm:inline">Previous</span>
+            </Button>
+            <Button size="sm" variant="outline" onClick={togglePlayPause} className="h-8 sm:h-9 bg-white/10 border-white/20 text-white hover:bg-white/20 hover:text-white">
+              {isPlaying ? (
+                <><Pause className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-1" /><span className="hidden sm:inline">Pause</span></>
+              ) : (
+                <><Play className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-1" /><span className="hidden sm:inline">Play</span></>
+              )}
+            </Button>
+            <Button size="sm" variant="outline" onClick={nextSlide} disabled={currentSlide === totalSlides - 1} className="h-8 sm:h-9 bg-white/10 border-white/20 text-white hover:bg-white/20 hover:text-white">
+              <span className="hidden sm:inline">Next</span>
+              <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4" />
+            </Button>
+          </div>
+
+          <div className="flex-1 max-w-md min-w-[100px]">
+            <div className="flex gap-0.5 sm:gap-1">
+              {slides.map((_, index) => (
+                <div
+                  key={index}
+                  className={`h-1.5 flex-1 rounded-full transition-colors cursor-pointer ${
+                    index < currentSlide ? 'bg-blue-400' : index === currentSlide ? 'bg-white' : 'bg-white/30'
+                  }`}
+                  onClick={() => setCurrentSlide(index)}
+                />
+              ))}
+            </div>
+          </div>
+
+          <Button size="sm" variant="outline" onClick={toggleFullscreen} className="h-8 sm:h-9 px-2 sm:px-3 bg-white/10 border-white/20 text-white hover:bg-white/20 hover:text-white">
+            <Maximize2 className="h-3 w-3 sm:h-4 sm:w-4" />
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Normal (non-fullscreen) layout ─────────────────────────────────────────
+  return (
+    <div className="relative">
       {/* Presentation Display */}
       <div className="relative w-full aspect-video bg-white rounded-lg overflow-hidden shadow-2xl">
         <SlideRenderer slide={slide} />

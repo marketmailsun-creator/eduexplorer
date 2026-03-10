@@ -46,7 +46,7 @@ export function Header() {
           .catch(() => {});
       })
       .catch(() => {});
-  }, [session?.user?.id]);
+  }, [session?.user?.id, pathname]);
 
   return (
     <header className="border-b bg-white shadow-sm sticky top-0 z-50">
