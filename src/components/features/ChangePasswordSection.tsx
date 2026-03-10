@@ -80,7 +80,7 @@ export function ChangePasswordSection({ hasPassword }: ChangePasswordSectionProp
       </button>
 
       {/* Google-only users */}
-      {!hasPassword && (
+      {/* {!hasPassword && (
         <div className="px-5 pb-4">
           <div className="bg-blue-50 rounded-xl p-3 border border-blue-100">
             <p className="text-xs text-blue-700">
@@ -88,7 +88,7 @@ export function ChangePasswordSection({ hasPassword }: ChangePasswordSectionProp
             </p>
           </div>
         </div>
-      )}
+      )} */}
 
       {/* Change password form — only for credentials users */}
       {hasPassword && isOpen && (

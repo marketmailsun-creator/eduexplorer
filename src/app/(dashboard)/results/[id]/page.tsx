@@ -23,7 +23,7 @@ export default async function ResultsPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ challenge?: string }>;
+  searchParams: Promise<{ challenge?: string; mode?: string }>;
 }) {
   const session = await auth();
   if (!session?.user) {
@@ -31,7 +31,8 @@ export default async function ResultsPage({
   }
 
   const { id } = await params;
-  const { challenge: challengeParam } = await searchParams;
+  const { challenge: challengeParam, mode } = await searchParams;
+  const autoQuizMode = mode === 'quiz';
 
   console.log('📊 Loading results for query:', id);
 
@@ -212,6 +213,7 @@ export default async function ResultsPage({
             queryId={id}
             isOwner={isOwner}
             challengeId={challengeId}
+            autoQuizMode={autoQuizMode}
           />
         </div>
         <div className="px-4 sm:px-6 pb-10 max-w-7xl mx-auto">

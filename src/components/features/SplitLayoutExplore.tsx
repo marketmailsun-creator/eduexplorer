@@ -90,9 +90,11 @@ interface SplitLayoutExploreProps {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
+  const autoSubmitKeyRef = useRef<string | null>(null);
 
   const [loadingQuery, setLoadingQuery] = useState('');
   const [hasMediaLoading, setHasMediaLoading] = useState(false);
+  const [isAutoQuizLoading, setIsAutoQuizLoading] = useState(false);
   
   const TRENDING = [
     'Artificial Intelligence',
@@ -117,10 +119,29 @@ interface SplitLayoutExploreProps {
   }, [showHistory]);
 
   const searchParams = useSearchParams();
+  const isAutoQuiz = searchParams.get('autoQuiz') === '1';
+
    useEffect(() => {
      const q = searchParams.get('q');
      if (q) setQuery(decodeURIComponent(q));
    }, [searchParams]);
+
+  // Auto-submit when both ?q and ?autoQuiz=1 are in the URL (from CurriculumSelector).
+  // Deps include [searchParams] so this re-fires on soft navigation (same-page URL change).
+  // autoSubmitKeyRef guards against double-submission for the same query.
+  useEffect(() => {
+    const q = searchParams.get('q');
+    const autoQuiz = searchParams.get('autoQuiz');
+    if (q && autoQuiz === '1' && autoSubmitKeyRef.current !== q) {
+      autoSubmitKeyRef.current = q;
+      const decodedQ = decodeURIComponent(q);
+      const timer = setTimeout(() => {
+        proceedWithSubmit(true, decodedQ);
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
    
   // Load conversation history
   const loadHistory = async () => {
@@ -319,19 +340,24 @@ interface SplitLayoutExploreProps {
     setIsPlayingAudio(false);
   };
 
-  const proceedWithSubmit = async () => {
+  const proceedWithSubmit = async (autoQuizMode = false, queryOverride?: string) => {
     setShowSimilar(false);
     setSimilarContent([]);
+    const effectiveQuery = queryOverride !== undefined ? queryOverride : query;
     const hasMedia = attachedFiles.length > 0 || !!audioBlob;
     setLoading(true);
-    setLoadingQuery(query || 'your attached content');
+    setIsAutoQuizLoading(autoQuizMode);
+    setLoadingQuery(effectiveQuery || 'your attached content');
     setHasMediaLoading(hasMedia);
     setError('');
 
     try {
       const formData = new FormData();
-      formData.append('query', query);
+      formData.append('query', effectiveQuery);
       formData.append('learningLevel', level);
+      if (autoQuizMode) {
+        formData.append('autoQuiz', 'true');
+      }
       attachedFiles.forEach((attachedFile) => {
         formData.append('files', attachedFile.file);
       });
@@ -346,11 +372,12 @@ interface SplitLayoutExploreProps {
       if (!response.ok) {
         throw new Error(data.error || 'Failed to submit query');
       }
-      router.push(`/results/${data.queryId}`);
+      router.push(`/results/${data.queryId}${autoQuizMode ? '?mode=quiz' : ''}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
       setLoading(false);
       setLoadingQuery('');
+      setIsAutoQuizLoading(false);
     }
   };
 
@@ -383,7 +410,7 @@ interface SplitLayoutExploreProps {
   const capabilities = [
     { icon: Zap, text: "Instant AI Research", color: "text-yellow-500" },
     { icon: Target, text: "4 Learning Levels", color: "text-blue-500" },
-    { icon: Award, text: "7 Content Formats", color: "text-purple-500" },
+    { icon: Award, text: "6 Content Formats", color: "text-purple-500" },
     { icon: Clock, text: "Learn Anywhere", color: "text-green-500" },
     { icon: TrendingUp, text: "Track Progress", color: "text-red-500" },
   ];
@@ -407,7 +434,7 @@ interface SplitLayoutExploreProps {
     // { icon: Network, title: "Map", color: "from-teal-500 to-cyan-500" },
   ];
   if (loading && loadingQuery) {
-      return <LoadingProgressScreen query={loadingQuery} hasMedia={hasMediaLoading} />;
+      return <LoadingProgressScreen query={loadingQuery} hasMedia={hasMediaLoading} isQuizMode={isAutoQuizLoading} />;
   }
   if (showOnboarding) {
       return (
@@ -420,17 +447,17 @@ interface SplitLayoutExploreProps {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-purple-50 pb-16 md:pb-8">
-      <div className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-6 md:py-8">
-        <div className="flex justify-end mb-4 sm:mb-5">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 py-2 sm:py-6 md:py-8">
+        <div className="flex justify-end mb-2 sm:mb-5">
           <DailyGoalWidget compact />
         </div>
         <ContinueLearning />
         {/* Main Layout - Stack on Mobile, Side-by-Side on Desktop */}
-        <div className="flex flex-col lg:grid lg:grid-cols-12 gap-4 sm:gap-6">
-          
+        <div className="flex flex-col lg:grid lg:grid-cols-12 gap-3 sm:gap-6">
+
           {/* LEFT: Query Input */}
           <div className="lg:col-span-7">
-            <div className="bg-white rounded-xl sm:rounded-2xl shadow-xl p-4 sm:p-6 border border-gray-100">
+            <div className="bg-white rounded-xl sm:rounded-2xl shadow-xl p-3 sm:p-6 border border-gray-100">
               <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-4">
                 
                 {/* Query Input - Mobile Optimized */}
@@ -443,7 +470,7 @@ interface SplitLayoutExploreProps {
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                     placeholder="Type your question, or attach an image/file and submit directly..."
-                    className="min-h-[100px] sm:min-h-[120px] text-sm sm:text-base resize-none"
+                    className="min-h-[80px] sm:min-h-[120px] text-sm sm:text-base resize-none"
                     disabled={loading}
                     
                   />
@@ -532,7 +559,7 @@ interface SplitLayoutExploreProps {
                     <div className="flex gap-2 pt-1">
                       <button
                         type="button"
-                        onClick={proceedWithSubmit}
+                        onClick={() => proceedWithSubmit()}
                         className="flex-1 py-2 rounded-lg bg-violet-600 text-white text-xs font-semibold hover:bg-violet-700 transition-colors"
                       >
                         Generate New
@@ -641,10 +668,10 @@ interface SplitLayoutExploreProps {
           </div>
 
           {/* RIGHT: Features Showcase - Mobile Optimized */}
-          <div className="lg:col-span-5 space-y-4 sm:space-y-6">
+          <div className="lg:col-span-5 space-y-3 sm:space-y-6">
             
             {/* Capabilities - Mobile Optimized */}
-            <div className="bg-white rounded-xl sm:rounded-2xl shadow-lg p-4 sm:p-6 border border-gray-100">
+            <div className="bg-white rounded-xl sm:rounded-2xl shadow-lg p-3 sm:p-6 border border-gray-100">
               <h3 className="text-base sm:text-lg font-bold text-gray-900 mb-3 sm:mb-4">What You'll Get</h3>
               <div className="space-y-2 sm:space-y-3">
                 {capabilities.map((cap, idx) => (
@@ -657,7 +684,7 @@ interface SplitLayoutExploreProps {
             </div>
 
             {/* 7 Formats - Mobile Optimized Grid */}
-            <div className="bg-white rounded-xl sm:rounded-2xl shadow-lg p-4 sm:p-6 border border-gray-100">
+            <div className="bg-white rounded-xl sm:rounded-2xl shadow-lg p-3 sm:p-6 border border-gray-100">
               <h3 className="text-base sm:text-lg font-bold text-gray-900 mb-3 sm:mb-4">7 Learning Formats</h3>
               <div className="grid grid-cols-3 sm:grid-cols-3 gap-1.5 sm:gap-2">
                 {features.map((feature, idx) => (

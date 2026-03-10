@@ -4,6 +4,7 @@ import { useSession, signOut } from 'next-auth/react';
 import { Button } from '@/components/ui/button';
 import { User, LogOut, Crown, TrendingUp, Menu, X, Users, BookOpen, Compass, Trophy, Swords, Bell } from 'lucide-react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { AvatarWithInitials } from '@/components/ui/avatar-with-initials';
 import { XPBar } from '@/components/gamification/XPBar';
@@ -16,6 +17,13 @@ export function Header() {
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [totalXP, setTotalXP] = useState(0);
   const [currentStreak, setCurrentStreak] = useState(0);
+
+  // Close menus on any route change (e.g. bottom nav tap)
+  const pathname = usePathname();
+  useEffect(() => {
+    setShowMobileMenu(false);
+    setShowDropdown(false);
+  }, [pathname]);
 
   useEffect(() => {
     if (!session?.user?.id) return;

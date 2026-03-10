@@ -11,6 +11,8 @@
 
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { cleanForJSON } from '../utils/text-cleaning-utils';
+import { prisma } from '../db/prisma';
+import { Prisma } from '@prisma/client';
 
 const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
 const genAI = GOOGLE_API_KEY ? new GoogleGenerativeAI(GOOGLE_API_KEY) : null;
@@ -185,4 +187,49 @@ export async function generatePracticeQuestions(
 ): Promise<PracticeQuiz> {
   // Delegate to topic-first generation (ignores articleText for better variety)
   return generateTopicQuiz(topic, count, level, [], 1);
+}
+
+/**
+ * Generate a quiz for a query and save it to the database.
+ * Idempotent: if a quiz already exists for this queryId, returns immediately.
+ * Called from the submit route when autoQuiz=true, so the results page
+ * loads with the quiz already in the DB (no router.refresh() needed).
+ */
+export async function generateAndSaveQuizForQuery(
+  queryId: string,
+  queryText: string,
+  complexityLevel: string,
+): Promise<void> {
+  // Idempotent check
+  const existing = await prisma.content.findFirst({
+    where: { queryId, contentType: 'quiz' },
+  });
+  if (existing) {
+    console.log(`✅ Quiz already exists for queryId ${queryId} — skipping generation`);
+    return;
+  }
+
+  console.log(`🧠 Pre-generating quiz for autoQuiz: ${queryText}`);
+  const quiz = await generateTopicQuiz(
+    queryText,
+    10,
+    complexityLevel || 'college',
+    [],
+    1,
+  );
+
+  await prisma.content.create({
+    data: {
+      queryId,
+      contentType: 'quiz',
+      title: `${queryText} - Quiz Set 1`,
+      data: {
+        status: 'completed',
+        setNumber: 1,
+        quiz: quiz as unknown as Prisma.InputJsonValue,
+      } as Prisma.InputJsonValue,
+    },
+  });
+
+  console.log(`✅ Quiz pre-generated and saved for queryId ${queryId}`);
 }

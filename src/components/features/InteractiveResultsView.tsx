@@ -1,14 +1,15 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { 
-  BookOpen, 
-  FileText, 
-  Presentation, 
-  Layers, 
-  Brain, 
-  BarChart3, 
+import {
+  BookOpen,
+  FileText,
+  Presentation,
+  Layers,
+  Brain,
+  BarChart3,
   Network,
   Headphones,
   Volume2,
@@ -16,7 +17,8 @@ import {
   ChevronUp,
   Maximize2,
   Minimize2,
-  Download
+  Download,
+  Loader2
 } from 'lucide-react';
 import { AudioPlayerSection } from './AudioPlayerSection';
 import { PresentationViewer } from './PresentationViewer';
@@ -53,6 +55,8 @@ interface InteractiveResultsViewProps {
   isOwner?: boolean;
   /** When set, quiz submits challenge score to /api/challenge/submit-score */
   challengeId?: string;
+  /** When true, auto-triggers quiz and shows "Generate Explanation" CTA instead of article */
+  autoQuizMode?: boolean;
 }
 
 type CardSize = 'normal' | 'minimized' | 'maximized';
@@ -75,8 +79,51 @@ export function InteractiveResultsView({
   queryId,
   isOwner = true,
   challengeId,
+  autoQuizMode = false,
 }: InteractiveResultsViewProps) {
   
+  const router = useRouter();
+  const autoQuizStarted = useRef(false);
+  const [generatingArticle, setGeneratingArticle] = useState(false);
+  const [articleGenerateError, setArticleGenerateError] = useState('');
+
+  // Auto-trigger quiz generation when arriving via autoQuiz mode (no article generated yet)
+  useEffect(() => {
+    if (autoQuizMode && !hasQuiz && isOwner && !autoQuizStarted.current) {
+      autoQuizStarted.current = true;
+      fetch('/api/content/quiz/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ queryId, numQuestions: 10 }),
+      }).then(res => {
+        if (res.ok) router.refresh();
+      }).catch(() => {});
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleGenerateArticle = async () => {
+    setGeneratingArticle(true);
+    setArticleGenerateError('');
+    try {
+      const res = await fetch('/api/content/article/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ queryId }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        setArticleGenerateError(data.error || 'Failed to generate explanation');
+        return;
+      }
+      router.refresh();
+    } catch {
+      setArticleGenerateError('Failed to generate explanation');
+    } finally {
+      setGeneratingArticle(false);
+    }
+  };
+
   // Card size states
   const [explanationSize, setExplanationSize] = useState<CardSize>('normal');
   const [audioSize, setAudioSize] = useState<CardSize>('normal');
@@ -262,6 +309,26 @@ export function InteractiveResultsView({
               {cleanText ? (
                 <div className="prose prose-sm max-w-none text-gray-700 leading-relaxed whitespace-pre-wrap">
                   {cleanText}
+                </div>
+              ) : autoQuizMode ? (
+                <div className="text-center py-10 bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100 rounded-xl space-y-3">
+                  <FileText className="h-14 w-14 mx-auto text-blue-400" />
+                  <p className="text-gray-600 text-sm">No explanation generated yet.</p>
+                  {articleGenerateError && (
+                    <p className="text-sm text-red-600">{articleGenerateError}</p>
+                  )}
+                  <button
+                    type="button"
+                    onClick={handleGenerateArticle}
+                    disabled={generatingArticle}
+                    className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:opacity-60 text-white text-sm font-semibold rounded-lg transition-colors"
+                  >
+                    {generatingArticle ? (
+                      <><Loader2 className="h-4 w-4 animate-spin" /> Generating...</>
+                    ) : (
+                      <><FileText className="h-4 w-4" /> Generate Comprehensive Explanation</>
+                    )}
+                  </button>
                 </div>
               ) : (
                 <p className="text-gray-400 italic text-sm">Content is being generated...</p>

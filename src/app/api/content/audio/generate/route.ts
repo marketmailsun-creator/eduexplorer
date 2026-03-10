@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { generateSpeech } from '@/lib/api/elevenlabs';
+import { generateSpeech } from '@/lib/api/google-tts';
 import { prisma } from '@/lib/db/prisma';
 import { canGenerateContent, canGenerateAudioOnDemand } from '@/lib/services/plan-limits.service';
 import { generateAudioSummary } from '@/lib/services/audio-summarizer';

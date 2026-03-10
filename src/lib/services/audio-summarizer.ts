@@ -1,20 +1,20 @@
-import Anthropic from '@anthropic-ai/sdk';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import OpenAI from 'openai';
 import { formatForAudio } from '../utils/text-formatter';
 import { incrementUsageCounter, sendQuotaAlertOnce } from '../db/redis';
 
-const client = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
-const MODEL = 'claude-sonnet-4-5-20250929';
+const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
+const genAI = GOOGLE_API_KEY ? new GoogleGenerativeAI(GOOGLE_API_KEY) : null;
+const MODEL = 'gemini-2.5-flash';
 
-// Groq client — free tier, OpenAI-compatible API
+// Groq client — free tier fallback, OpenAI-compatible API
 const groqClient = process.env.GROQ_API_KEY
   ? new OpenAI({
       apiKey: process.env.GROQ_API_KEY,
       baseURL: 'https://api.groq.com/openai/v1',
     })
   : null;
+
 interface AudioSummaryOptions {
   text: string;
   maxDurationMinutes?: number;
@@ -37,17 +37,22 @@ export async function generateAudioSummary(
 
   const targetWords = maxDurationMinutes * 150; // 150 words per minute
 
+  if (!genAI) {
+    console.warn('⚠️ GOOGLE_API_KEY missing — using Groq fallback for audio summary');
+    const groqSummary = await generateAudioSummaryWithGroq(options);
+    if (groqSummary) return groqSummary;
+    return truncateForAudio(text, targetWords);
+  }
+
   try {
-    await incrementUsageCounter('anthropic');
-    const message = await client.messages.create({
+    await incrementUsageCounter('gemini');
+    const geminiModel = genAI.getGenerativeModel({
       model: MODEL,
-      max_tokens: 2000,
-      system: `You are an expert at creating concise, engaging audio summaries for educational content. 
+      systemInstruction: `You are an expert at creating concise, engaging audio summaries for educational content.
 Your summaries are optimized for text-to-speech and listening comprehension.`,
-      messages: [
-        {
-          role: 'user',
-          content: `Create a concise audio summary of this educational content for ${learningLevel} level students.
+    });
+
+    const prompt = `Create a concise audio summary of this educational content for ${learningLevel} level students.
 
 REQUIREMENTS:
 - Maximum ${targetWords} words (for ${maxDurationMinutes}-minute audio)
@@ -66,27 +71,22 @@ STRUCTURE:
 ORIGINAL CONTENT:
 ${text}
 
-Generate the audio summary now (plain text only, no formatting):`,
-        },
-      ],
-    });
+Generate the audio summary now (plain text only, no formatting):`;
 
-    const summary = message.content
-      .filter((block) => block.type === 'text')
-      .map((block) => (block as any).text)
-      .join('\n');
+    const result = await geminiModel.generateContent(prompt);
+    const summary = result.response.text();
 
     // Clean any remaining formatting
     const cleanSummary = formatForAudio(summary);
 
     // Verify word count
     const wordCount = cleanSummary.split(/\s+/).length;
-    console.log(`📝 Audio summary generated: ${wordCount} words (~${Math.ceil(wordCount / 150)} minutes)`);
+    console.log(`📝 Audio summary generated (Gemini): ${wordCount} words (~${Math.ceil(wordCount / 150)} minutes)`);
 
     return cleanSummary;
   } catch (error) {
-    console.error('Audio summary generation error (Claude):', error);
-    await sendQuotaAlertOnce('anthropic', `Anthropic audio summary failed.\nError: ${error instanceof Error ? error.message : String(error)}`);
+    console.error('Audio summary generation error (Gemini):', error);
+    await sendQuotaAlertOnce('gemini', `Gemini audio summary failed.\nError: ${error instanceof Error ? error.message : String(error)}`);
     // Fallback 1: Try Groq (free model)
     const groqSummary = await generateAudioSummaryWithGroq(options);
     if (groqSummary) {
@@ -163,14 +163,14 @@ function truncateForAudio(text: string, targetWords: number): string {
 
   // Truncate to target words and ensure sentence ending
   let truncated = words.slice(0, targetWords).join(' ');
-  
+
   // Try to end on a sentence
   const lastPeriod = truncated.lastIndexOf('.');
   const lastQuestion = truncated.lastIndexOf('?');
   const lastExclamation = truncated.lastIndexOf('!');
-  
+
   const lastSentenceEnd = Math.max(lastPeriod, lastQuestion, lastExclamation);
-  
+
   if (lastSentenceEnd > targetWords * 0.8) {
     truncated = truncated.substring(0, lastSentenceEnd + 1);
   } else {

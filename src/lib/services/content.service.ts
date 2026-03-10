@@ -1,9 +1,5 @@
 import OpenAI from 'openai';
-import { generateSpeech } from '../api/elevenlabs';
 import { prisma } from '../db/prisma';
-import { writeFile, mkdir } from 'fs/promises';
-import { join } from 'path';
-import { existsSync } from 'fs';
 import { formatForDisplay } from '../utils/text-formatter';
 import { incrementUsageCounter, sendQuotaAlertOnce } from '../db/redis';
 
@@ -19,39 +15,80 @@ console.log('🔑 Content Service - Groq API:', GROQ_API_KEY ? '✅ SET' : '❌ 
 async function generateArticleWithGroq(
   researchData: string,
   topic: string,
-  learningLevel: string = 'college'
+  learningLevel: string = 'college',
+  sources: string[] = []
 ): Promise<string> {
   if (!groq) {
     throw new Error('GROQ_API_KEY not configured');
   }
 
-  console.log('📝 Generating article with Groq (Llama 3.1)...');
+  console.log('📝 Generating deep article with Groq (Llama 3.3 70B)...');
 
-  const levelGuidelines = {
-    elementary: 'Use simple language, short sentences, and lots of examples',
-    'high-school': 'Balance accessibility with depth, introduce technical terms',
-    college: 'Academic rigor, cite research, use domain terminology',
-    adult: 'Professional tone, practical applications, career relevance',
+  const levelDepthGuidelines = {
+    elementary: `Write for curious 10-12 year olds. Use simple language and short sentences. Explain every technical word. Use relatable everyday examples. Make it exciting and fun. Avoid jargon. Use analogies children can relate to.`,
+    'high-school': `Write for teenagers (14-18). Balance clarity with academic rigor. Introduce technical vocabulary but always define it. Use real examples from science, history, or culture. Connect concepts to things they've studied. Include some mathematical or quantitative examples where relevant.`,
+    college: `Write at undergraduate academic level. Use precise domain terminology. Demonstrate theoretical depth and nuance. Include quantitative reasoning where applicable. Reference methodologies and frameworks. Draw connections across disciplines. Cite the type of evidence that supports each claim.`,
+    adult: `Write for working professionals. Connect theory directly to practical applications and career relevance. Use industry terminology correctly. Include case studies and real-world scenarios. Acknowledge complexity and trade-offs. Focus on actionable insights alongside conceptual understanding.`,
   };
 
-  const systemPrompt = `You are an expert educational content creator specializing in ${learningLevel} education. ${levelGuidelines[learningLevel as keyof typeof levelGuidelines]}. Focus on clarity, accuracy, and engagement.`;
+  const systemPrompt = `You are a world-class educational author and subject matter expert writing a comprehensive, in-depth educational article for ${learningLevel} level learners.
 
-  const prompt = `Based on this research: ${researchData}
+${levelDepthGuidelines[learningLevel as keyof typeof levelDepthGuidelines] || levelDepthGuidelines.college}
 
-Create a comprehensive educational article about "${topic}".
+Your writing standards:
+- Every section must go beyond surface-level description into genuine analysis and explanation
+- Use specific facts, figures, dates, names, and mechanisms — not vague generalities
+- Explain the WHY behind concepts, not just the WHAT
+- Connect ideas to their broader context and significance
+- Write with intellectual depth while maintaining clarity appropriate to the level
+- Structure content with clear headings and well-developed paragraphs
+- Aim for completeness — a student should finish reading and feel they truly understand the topic`;
 
-Structure:
-1. Introduction (hook the learner)
-2. Core Concepts (clear explanations)
-3. Examples & Applications
-4. Summary & Key Takeaways
+  const sourcesList = sources.length > 0
+    ? `\n\nSources consulted:\n${sources.slice(0, 8).map((url, i) => `${i + 1}. ${url}`).join('\n')}`
+    : '';
 
-Make it engaging, clear, and appropriate for ${learningLevel} level.`;
+  const prompt = `You have the following research on "${topic}":
+
+---
+${researchData}
+---
+${sourcesList}
+
+Write a comprehensive, in-depth educational article on "${topic}" for ${learningLevel} level learners.
+
+Use the following 8-section structure. Each section must be substantive and detailed — aim for 200-400 words per section:
+
+## 1. Introduction
+Hook the reader with a compelling opening. State why this topic matters and what they will learn. Preview the key ideas.
+
+## 2. Background & Historical Context
+When and how did this concept/field/phenomenon emerge? Who are the key figures? What historical developments led to current understanding? What problem or question does this topic address?
+
+## 3. Core Concepts & Theoretical Foundations
+Explain the fundamental principles, theories, or mechanisms in detail. Define all key terms. Break down complex ideas step by step. Use precise language appropriate to the level.
+
+## 4. In-Depth Analysis & Explanation
+Go beyond the basics. Explain HOW and WHY things work the way they do. Cover the mechanisms, processes, or reasoning in depth. Address the nuances and subtleties that distinguish real understanding from surface knowledge.
+
+## 5. Real-World Applications & Case Studies
+Provide 3-4 concrete, specific real-world examples or case studies. Show how the concepts play out in practice. Include specific details — names, places, outcomes, numbers where relevant.
+
+## 6. Common Misconceptions & Clarifications
+What do people commonly misunderstand about this topic? Correct at least 2-3 common misconceptions. Explain why the misconception exists and what the correct understanding is.
+
+## 7. Connections & Advanced Insights
+How does this topic connect to related fields or concepts? What are the broader implications? What cutting-edge developments or open questions exist? What should a curious learner explore next?
+
+## 8. Summary & Key Takeaways
+Synthesize the most important points. List 5-7 specific, actionable key takeaways that capture the essence of deep understanding. End with a thought-provoking closing statement.
+
+Write in a clear, authoritative voice. Be specific. Use examples. Demonstrate genuine depth of knowledge. Do not use placeholder text or say "as mentioned above" — each section should stand on its own merit.`;
 
   try {
     await incrementUsageCounter('groq');
     const response = await groq.chat.completions.create({
-      model: 'llama-3.1-8b-instant', // FREE, fast, good quality
+      model: 'llama-3.3-70b-versatile',
       messages: [
         {
           role: 'system',
@@ -63,7 +100,7 @@ Make it engaging, clear, and appropriate for ${learningLevel} level.`;
         },
       ],
       temperature: 0.7,
-      max_tokens: 4000,
+      max_tokens: 8192,
     });
 
     const article = response.choices[0].message.content || '';
@@ -87,13 +124,22 @@ export async function generateContentForQuery(queryId: string) {
 
   console.log(`📝 Generating content for query: ${queryId}`);
 
-  // Generate article with Groq
+  // Use full research content (not just the 500-char summary)
+  const fullResearchContent = (research.rawData as any)?.cleanedContent || research.summary;
+  const sourceUrls: string[] = Array.isArray((research.rawData as any)?.citations)
+    ? (research.rawData as any).citations
+    : [];
+
+  console.log(`📊 Research input: ${fullResearchContent.length} chars, ${sourceUrls.length} sources`);
+
   const article = await generateArticleWithGroq(
-    research.summary,
+    fullResearchContent,
     research.query.queryText,
-    research.query.complexityLevel || 'college'
+    research.query.complexityLevel || 'college',
+    sourceUrls
   );
- const cleanedArticle = formatForDisplay(article);
+
+  const cleanedArticle = formatForDisplay(article);
   const articleContent = await prisma.content.create({
     data: {
       queryId,
@@ -105,44 +151,5 @@ export async function generateContentForQuery(queryId: string) {
 
   console.log(`✅ Article content created: ${articleContent.id}`);
 
-  // Generate audio in background (non-blocking)
-  // if (process.env.ELEVENLABS_API_KEY) {
-  //   generateAudioAsync(queryId, article).catch((error) => {
-  //     console.warn('⚠️ Audio generation skipped:', error.message);
-  //   });
-  // } else {
-  //   console.log('⚠️ ELEVENLABS_API_KEY not set, skipping audio generation');
-  // }
-
   return articleContent;
-}
-
-async function generateAudioAsync(queryId: string, text: string) {
-  try {
-    console.log(`🎵 Starting audio generation for query: ${queryId}`);
-
-    const audioBuffer = await generateSpeech({ text });
-    const audioDir = join(process.cwd(), 'public', 'audio');
-    
-    if (!existsSync(audioDir)) {
-      await mkdir(audioDir, { recursive: true });
-    }
-    
-    const audioPath = join(audioDir, `${queryId}.mp3`);
-    await writeFile(audioPath, audioBuffer);
-
-    await prisma.content.create({
-      data: {
-        queryId,
-        contentType: 'audio',
-        title: 'Audio Narration',
-        storageUrl: `/audio/${queryId}.mp3`,
-        data: { duration: 0 },
-      },
-    });
-
-    console.log(`✅ Audio generated: ${queryId}.mp3`);
-  } catch (error: any) {
-    console.error('❌ Audio generation failed:', error.message);
-  }
 }

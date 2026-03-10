@@ -20,23 +20,30 @@ export const PLAN_LIMITS = {
 };
 
 // Daily lesson limits (AI queries/searches per day)
-const DAILY_LESSON_LIMIT = { free: 5, pro: Infinity } as const;
+const DAILY_LESSON_LIMIT = { free: 5, pro: 15 } as const;
 
 function todayKey(): string {
   return new Date().toISOString().split('T')[0];
 }
 
 /**
- * Get how many AI lessons a free-plan user has remaining today.
+ * Get how many AI lessons a user has used today (for display purposes).
+ */
+export async function getDailyLessonsUsed(userId: string): Promise<number> {
+  const key = `daily_lessons:${userId}:${todayKey()}`;
+  return (await redis.get<number>(key)) ?? 0;
+}
+
+/**
+ * Get how many AI lessons a user has remaining today.
  */
 export async function getDailyLessonsRemaining(
   userId: string,
   plan: 'free' | 'pro'
 ): Promise<number> {
-  if (plan === 'pro') return Infinity;
   const key = `daily_lessons:${userId}:${todayKey()}`;
   const count = (await redis.get<number>(key)) ?? 0;
-  return Math.max(0, DAILY_LESSON_LIMIT.free - count);
+  return Math.max(0, DAILY_LESSON_LIMIT[plan] - count);
 }
 
 /**
@@ -56,14 +63,11 @@ export async function checkDailyLessonAllowed(
   userId: string,
   plan: 'free' | 'pro'
 ): Promise<{ allowed: boolean; remaining: number; limit: number }> {
-  if (plan === 'pro') {
-    return { allowed: true, remaining: Infinity, limit: Infinity };
-  }
   const remaining = await getDailyLessonsRemaining(userId, plan);
   return {
     allowed: remaining > 0,
     remaining,
-    limit: DAILY_LESSON_LIMIT.free,
+    limit: DAILY_LESSON_LIMIT[plan],
   };
 }
 

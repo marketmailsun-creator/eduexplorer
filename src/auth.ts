@@ -326,9 +326,17 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         token.age = dbUser?.age || calculateAge(dbUser?.dateOfBirth || null) || null;
       }
       
-      if (trigger === 'update' && session) {
-        token.plan = session.plan;
-        token.age = session.age;
+      if (trigger === 'update') {
+        // Always re-read plan from DB on session update so post-subscription
+        // changes are reflected without requiring the caller to pass plan data.
+        // This makes update() (called without args from success page) work correctly.
+        const freshUser = await prisma.user.findUnique({
+          where: { id: token.id as string },
+          select: { plan: true },
+        });
+        token.plan = freshUser?.plan || 'free';
+        // Still allow callers to update age if they pass it
+        if (session?.age !== undefined) token.age = session.age;
       }
       
       return token;
