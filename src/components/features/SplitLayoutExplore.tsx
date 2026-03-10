@@ -142,6 +142,22 @@ interface SplitLayoutExploreProps {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
+
+  // Auto-submit when ?autoSubmit=1 is in URL (from CurriculumSelector "Explore full chapter").
+  // Uses the same autoSubmitKeyRef guard to prevent double-submission.
+  useEffect(() => {
+    const q = searchParams.get('q');
+    const autoSubmit = searchParams.get('autoSubmit');
+    if (q && autoSubmit === '1' && autoSubmitKeyRef.current !== q) {
+      autoSubmitKeyRef.current = q;
+      const decodedQ = decodeURIComponent(q);
+      const timer = setTimeout(() => {
+        proceedWithSubmit(false, decodedQ);
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
    
   // Load conversation history
   const loadHistory = async () => {

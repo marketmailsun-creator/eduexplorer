@@ -61,6 +61,74 @@ interface InteractiveResultsViewProps {
 
 type CardSize = 'normal' | 'minimized' | 'maximized';
 
+// ── Article heading renderer ─────────────────────────────────────────────────
+// Color palette for each of the 8 article sections
+const SECTION_COLORS: Record<number, { border: string; bg: string; text: string }> = {
+  1: { border: 'border-purple-400', bg: 'bg-purple-50', text: 'text-purple-900' },
+  2: { border: 'border-indigo-400', bg: 'bg-indigo-50', text: 'text-indigo-900' },
+  3: { border: 'border-blue-400',   bg: 'bg-blue-50',   text: 'text-blue-900'   },
+  4: { border: 'border-teal-400',   bg: 'bg-teal-50',   text: 'text-teal-900'   },
+  5: { border: 'border-green-400',  bg: 'bg-green-50',  text: 'text-green-900'  },
+  6: { border: 'border-orange-400', bg: 'bg-orange-50', text: 'text-orange-900' },
+  7: { border: 'border-amber-400',  bg: 'bg-amber-50',  text: 'text-amber-900'  },
+  8: { border: 'border-rose-400',   bg: 'bg-rose-50',   text: 'text-rose-900'   },
+};
+const DEFAULT_SECTION_COLOR = { border: 'border-gray-300', bg: 'bg-gray-50', text: 'text-gray-800' };
+
+function renderArticleWithHeadings(text: string) {
+  const lines = text.split('\n');
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const elements: any[] = [];
+  let paragraphBuffer: string[] = [];
+  let keyCounter = 0;
+
+  const flushParagraph = () => {
+    const content = paragraphBuffer.join('\n').trim();
+    if (content) {
+      elements.push(
+        <p key={`p-${keyCounter++}`} className="text-gray-700 leading-relaxed text-sm mb-3">
+          {content}
+        </p>
+      );
+    }
+    paragraphBuffer = [];
+  };
+
+  for (const line of lines) {
+    // Match ## N. Title or ## Title
+    const h2Match = line.match(/^##\s+(?:(\d+)\.?\s+)?(.+)$/);
+    if (h2Match) {
+      flushParagraph();
+      const sectionNum = h2Match[1] ? parseInt(h2Match[1]) : 0;
+      const headingText = h2Match[2].trim();
+      const colors = SECTION_COLORS[sectionNum] ?? DEFAULT_SECTION_COLOR;
+      elements.push(
+        <div key={`h2-${keyCounter++}`} className={`mt-6 mb-2 pl-3 border-l-4 ${colors.border} ${colors.bg} rounded-r-lg py-1.5 pr-3`}>
+          <h2 className={`text-base font-bold ${colors.text}`}>{headingText}</h2>
+        </div>
+      );
+      continue;
+    }
+
+    // Match ### Title
+    const h3Match = line.match(/^###\s+(.+)$/);
+    if (h3Match) {
+      flushParagraph();
+      elements.push(
+        <h3 key={`h3-${keyCounter++}`} className="text-sm font-semibold text-gray-700 mt-4 mb-1">
+          {h3Match[1].trim()}
+        </h3>
+      );
+      continue;
+    }
+
+    paragraphBuffer.push(line);
+  }
+
+  flushParagraph();
+  return elements;
+}
+
 export function InteractiveResultsView({
   query,
   cleanText,
@@ -307,8 +375,8 @@ export function InteractiveResultsView({
           {explanationSize !== 'minimized' && (
             <CardContent className={`overflow-auto ${explanationSize === 'maximized' ? 'h-[calc(80vh-4rem)]' : 'max-h-[400px]'}`}>
               {cleanText ? (
-                <div className="prose prose-sm max-w-none text-gray-700 leading-relaxed whitespace-pre-wrap">
-                  {cleanText}
+                <div className="prose prose-sm max-w-none">
+                  {renderArticleWithHeadings(cleanText)}
                 </div>
               ) : autoQuizMode ? (
                 <div className="text-center py-10 bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100 rounded-xl space-y-3">
@@ -380,6 +448,7 @@ export function InteractiveResultsView({
                 <PresentationViewer
                   presentationData={presentationData.presentation}
                   autoPlay={false}
+                  queryId={queryId}
                 />
               ) : (
                 <div className="text-center py-10 bg-gradient-to-br from-orange-50 to-red-50 border border-orange-100 rounded-xl">

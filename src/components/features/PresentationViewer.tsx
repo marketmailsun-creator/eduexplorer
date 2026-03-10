@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { ChevronLeft, ChevronRight, Maximize2, Play, Pause } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -41,6 +42,7 @@ interface PresentationData {
 interface PresentationViewerProps {
   presentationData: PresentationData;
   autoPlay?: boolean;
+  queryId?: string;
 }
 
 function ensureArray(content: any): string[] {
@@ -54,7 +56,8 @@ function ensureArray(content: any): string[] {
   return [];
 }
 
-export function PresentationViewer({ presentationData, autoPlay = false }: PresentationViewerProps) {
+export function PresentationViewer({ presentationData, autoPlay = false, queryId }: PresentationViewerProps) {
+  const router = useRouter();
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isPlaying, setIsPlaying] = useState(autoPlay);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -97,6 +100,18 @@ export function PresentationViewer({ presentationData, autoPlay = false }: Prese
     setIsFullscreen(!isFullscreen);
   };
 
+  // ESC key in fullscreen returns to results page
+  useEffect(() => {
+    if (!isFullscreen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && queryId) {
+        router.push(`/results/${queryId}`);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isFullscreen, queryId, router]);
+
   if (totalSlides === 0) {
     return (
       <div className="text-center py-12 text-gray-500">
@@ -109,6 +124,19 @@ export function PresentationViewer({ presentationData, autoPlay = false }: Prese
 
   return (
     <div className={`${isFullscreen ? 'fixed inset-0 z-50 bg-gray-900 p-8' : 'relative'}`}>
+      {/* Back to Results button — fullscreen only */}
+      {isFullscreen && queryId && (
+        <div className="absolute top-4 left-4 z-10">
+          <button
+            onClick={() => router.push(`/results/${queryId}`)}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/20 hover:bg-white/30 text-white text-sm font-medium transition-colors"
+          >
+            <ChevronLeft className="h-4 w-4" />
+            Back to Results
+          </button>
+        </div>
+      )}
+
       {/* Presentation Display */}
       <div className="relative w-full aspect-video bg-white rounded-lg overflow-hidden shadow-2xl">
         <SlideRenderer slide={slide} />

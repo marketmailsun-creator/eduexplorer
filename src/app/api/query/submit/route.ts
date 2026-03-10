@@ -227,12 +227,20 @@ export async function POST(req: NextRequest) {
       learningLevel,
     });
 
-    if (autoQuizFlag) {
-      // Pre-generate quiz server-side so results page loads with quiz already available.
-      // Eliminates client-side router.refresh() call in InteractiveResultsView.
-      await generateAndSaveQuizForQuery(result.queryId, enrichedQuery, learningLevel);
-    } else {
-      await generateContentForQuery(result.queryId);
+    try {
+      if (autoQuizFlag) {
+        // Pre-generate quiz server-side so results page loads with quiz already available.
+        // Eliminates client-side router.refresh() call in InteractiveResultsView.
+        await generateAndSaveQuizForQuery(result.queryId, enrichedQuery, learningLevel);
+      } else {
+        await generateContentForQuery(result.queryId);
+      }
+    } catch (contentError) {
+      // Clean up: remove the query from history so it doesn't appear as a failed/blank entry
+      console.error('Content generation failed — removing query from history:', contentError);
+      await prisma.query.delete({ where: { id: result.queryId } }).catch(() => {});
+      const message = contentError instanceof Error ? contentError.message : 'Failed to generate content';
+      return NextResponse.json({ error: message }, { status: 500 });
     }
 
     // Gamification: increment daily counter, award XP, update streak, check achievements

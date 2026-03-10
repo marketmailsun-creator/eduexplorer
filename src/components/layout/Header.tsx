@@ -25,6 +25,8 @@ export function Header() {
     setShowDropdown(false);
   }, [pathname]);
 
+  const isActive = (href: string) => pathname.startsWith(href);
+
   useEffect(() => {
     if (!session?.user?.id) return;
     fetch('/api/streak')
@@ -58,37 +60,37 @@ export function Header() {
           <>
             {/* Desktop Navigation */}
             <nav className="hidden md:flex items-center gap-2">
-              <Button variant="ghost" size="sm" asChild>
+              <Button variant="ghost" size="sm" asChild className={isActive('/explore') ? 'bg-purple-100 text-purple-700 hover:bg-purple-100' : ''}>
                 <Link href="/explore">
                   <Compass className="h-4 w-4 mr-1" />
                   Explore
                 </Link>
               </Button>
-              <Button variant="ghost" size="sm" asChild>
+              <Button variant="ghost" size="sm" asChild className={isActive('/library') ? 'bg-purple-100 text-purple-700 hover:bg-purple-100' : ''}>
                 <Link href="/library">
                   <BookOpen className="h-4 w-4 mr-1" />
                   Library
                 </Link>
               </Button>
-              <Button variant="ghost" size="sm" asChild>
+              <Button variant="ghost" size="sm" asChild className={isActive('/groups') ? 'bg-purple-100 text-purple-700 hover:bg-purple-100' : ''}>
                 <Link href="/groups">
                   <Users className="h-4 w-4 mr-1" />
                   Groups
                 </Link>
               </Button>
-              <Button variant="ghost" size="sm" asChild>
+              <Button variant="ghost" size="sm" asChild className={isActive('/challenges') ? 'bg-purple-100 text-purple-700 hover:bg-purple-100' : ''}>
                 <Link href="/challenges">
                   <Swords className="h-4 w-4 mr-1" />
                   Challenges
                 </Link>
               </Button>
-              <Button variant="ghost" size="sm" asChild>
+              <Button variant="ghost" size="sm" asChild className={isActive('/leaderboard') ? 'bg-purple-100 text-purple-700 hover:bg-purple-100' : ''}>
                 <Link href="/leaderboard">
                   <TrendingUp className="h-4 w-4 mr-1" />
                   Leaderboard
                 </Link>
               </Button>
-              <Button variant="ghost" size="sm" asChild>
+              <Button variant="ghost" size="sm" asChild className={isActive('/achievements') ? 'bg-purple-100 text-purple-700 hover:bg-purple-100' : ''}>
                 <Link href="/achievements">
                   <Trophy className="h-4 w-4 mr-1" />
                   Badges
