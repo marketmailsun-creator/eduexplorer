@@ -135,6 +135,29 @@ function PhoneLoginContent() {
       return;
     }
 
+    // ── Demo / test account bypass ─────────────────────────────────────
+    // Phone 9999999999 skips OTP entirely — instant login for Play Store
+    // reviewers and automated testing.
+    if (phone === '9999999999') {
+      setLoading(true);
+      try {
+        const result = await signIn('demo-phone', {
+          phone: '+919999999999',
+          redirect: false,
+        });
+        if (result?.error) {
+          setError('Demo login failed. Please try again.');
+        } else {
+          router.push(callbackUrl.startsWith('/') ? callbackUrl : '/explore');
+        }
+      } catch {
+        setError('Demo login failed. Please try again.');
+      } finally {
+        setLoading(false);
+      }
+      return; // do not proceed to Firebase OTP flow
+    }
+
     setLoading(true);
     try {
       // Clear previous reCAPTCHA if exists
@@ -312,8 +335,7 @@ function PhoneLoginContent() {
               <div className="space-y-4">
                 {isLocalhost && (
                   <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-800">
-                    <strong>Dev mode:</strong> Use test number <code>9999999999</code> with OTP <code>123456</code>{' '}
-                    (Firebase Console → Authentication → Phone → Test numbers)
+                    <strong>Dev / Test mode:</strong> Use <code>9999999999</code> for instant demo login — no OTP needed.
                   </div>
                 )}
                 <div>
