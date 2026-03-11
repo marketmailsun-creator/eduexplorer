@@ -1,0 +1,39 @@
+workflows:
+  ios-release:
+    name: iOS Release Build
+    max_build_duration: 60
+    environment:
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: ai.eduexplorer.app
+      vars:
+        XCODE_WORKSPACE: ios/App/App.xcworkspace
+        XCODE_SCHEME: App
+    scripts:
+      - name: Install Node dependencies
+        script: npm ci
+      - name: Capacitor sync
+        script: npx cap sync ios
+      - name: Install CocoaPods
+        script: |
+          cd ios/App
+          pod install
+      - name: Build iOS release
+        script: |
+          xcode-project use-profiles
+          xcodebuild \
+            -workspace "$XCODE_WORKSPACE" \
+            -scheme "$XCODE_SCHEME" \
+            -configuration Release \
+            -archivePath /tmp/eduexplorer.xcarchive \
+            archive
+          xcodebuild \
+            -exportArchive \
+            -archivePath /tmp/eduexplorer.xcarchive \
+            -exportPath /tmp/ipa \
+            -exportOptionsPlist /tmp/ExportOptions.plist
+    artifacts:
+      - /tmp/ipa/*.ipa
+    publishing:
+      app_store_connect:
+        submit_to_testflight: true

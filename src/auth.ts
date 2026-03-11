@@ -278,6 +278,57 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         };
       },
     }),
+
+    // ── Demo / test account bypass ──────────────────────────────────────────────
+    // Accepts phone +919999999999 with no OTP verification.
+    // Used by Google Play reviewers, automated testing, and demo access.
+    // NEVER extend this to other phone numbers.
+    CredentialsProvider({
+      id: 'demo-phone',
+      name: 'Demo Phone',
+      credentials: {
+        phone: { label: 'Phone', type: 'tel' },
+      },
+      async authorize(credentials) {
+        const DEMO_PHONE = '+919999999999';
+        if (credentials?.phone !== DEMO_PHONE) return null;
+
+        // Find or auto-create the demo user
+        let user = await prisma.user.findUnique({ where: { phone: DEMO_PHONE } });
+
+        if (!user) {
+          user = await prisma.user.create({
+            data: {
+              phone: DEMO_PHONE,
+              phoneVerified: new Date(),
+              name: 'Demo User',
+              email: 'demo@eduexplorer.ai',
+              emailVerified: new Date(),
+              plan: 'free',
+              age: 20,
+            },
+          });
+          await prisma.userPreferences.create({
+            data: {
+              userId: user.id,
+              learningLevel: 'college',
+              preferredVoice: 'professional',
+              autoAudio: false,
+              theme: 'light',
+            },
+          });
+        }
+
+        return {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          image: user.image,
+          plan: user.plan,
+          age: user.age,
+        };
+      },
+    }),
   ],
 
   callbacks: {

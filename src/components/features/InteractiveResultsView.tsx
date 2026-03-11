@@ -18,6 +18,7 @@ import {
   Download,
   Loader2,
   Link as LinkIcon,
+  ExternalLink,
 } from 'lucide-react';
 import { formatForDisplay } from '@/lib/utils/text-formatter';
 import { AudioPlayerSection } from './AudioPlayerSection';
@@ -128,6 +129,15 @@ function renderArticleWithHeadings(text: string) {
 
   flushParagraph();
   return elements;
+}
+
+/** Extract a readable hostname from a URL for display, e.g. "wikipedia.org" */
+function getReadableSource(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '');
+  } catch {
+    return url;
+  }
 }
 
 export function InteractiveResultsView({
@@ -371,24 +381,24 @@ export function InteractiveResultsView({
                   </div>
                   {sources.length > 0 && (
                     <div className="mt-6 pt-4 border-t border-gray-200">
-                      <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2 flex items-center gap-1">
+                      <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-3 flex items-center gap-1.5">
                         <LinkIcon className="h-3.5 w-3.5" />
-                        Sources
+                        Further Reading
                       </h3>
-                      <ul className="space-y-1">
+                      <div className="flex flex-wrap gap-2">
                         {sources.map((url, i) => (
-                          <li key={i} className="text-xs">
-                            <a
-                              href={url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-blue-600 hover:underline break-all"
-                            >
-                              {url}
-                            </a>
-                          </li>
+                          <a
+                            key={i}
+                            href={url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 hover:text-blue-800 text-xs font-medium rounded-full border border-blue-200 transition-colors"
+                          >
+                            <ExternalLink className="h-3 w-3 flex-shrink-0" />
+                            {getReadableSource(url)}
+                          </a>
                         ))}
-                      </ul>
+                      </div>
                     </div>
                   )}
                 </>
