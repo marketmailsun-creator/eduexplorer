@@ -27,21 +27,21 @@ export function CurriculumSelector() {
   const exploreTopic = (topic: string) => {
     const classLabel = curriculum.classes.find(c => c.classNumber === classNum)?.label ?? `Class ${classNum}`;
     const query = `${board} ${classLabel} ${subject}: ${chapter!.name} — ${topic}`;
-    router.push(`/explore?q=${encodeURIComponent(query)}&level=high-school`);
+    router.push(`/explore?q=${encodeURIComponent(query)}&level=high-school`, { scroll: false });
   };
 
   const exploreChapter = () => {
     if (!chapter || !classNum || !subject) return;
     const classLabel = curriculum.classes.find(c => c.classNumber === classNum)?.label ?? `Class ${classNum}`;
     const query = `${board} ${classLabel} ${subject}: ${chapter.name} — complete chapter overview`;
-    router.push(`/explore?q=${encodeURIComponent(query)}&level=high-school&autoSubmit=1`);
+    router.push(`/explore?q=${encodeURIComponent(query)}&level=high-school&autoSubmit=1`, { scroll: false });
   };
 
   const exploreChapterQuiz = () => {
     if (!chapter || !classNum || !subject) return;
     const classLabel = curriculum.classes.find(c => c.classNumber === classNum)?.label ?? `Class ${classNum}`;
     const query = `${board} ${classLabel} ${subject}: ${chapter.name} — complete chapter overview`;
-    router.push(`/explore?q=${encodeURIComponent(query)}&level=high-school&autoQuiz=1`);
+    router.push(`/explore?q=${encodeURIComponent(query)}&level=high-school&autoQuiz=1`, { scroll: false });
   };
 
   return (

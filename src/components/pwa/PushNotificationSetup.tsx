@@ -19,20 +19,37 @@ export function PushNotificationSetup() {
     return outputArray;
   };
 
+  const isNativePlatform = () =>
+    typeof window !== 'undefined' && !!(window as any).Capacitor?.isNativePlatform();
+
   const subscribe = async () => {
     setLoading(true);
 
     try {
+      // ── Native iOS/Android (Capacitor + FCM) ───────────────────────────────
+      if (isNativePlatform()) {
+        const { PushNotifications } = await import('@capacitor/push-notifications');
+        const { receive } = await PushNotifications.requestPermissions();
+        if (receive !== 'granted') {
+          alert('Please enable notifications in your device Settings → EduExplorer → Notifications');
+          return;
+        }
+        await PushNotifications.register();
+        setEnabled(true);
+        console.log('✅ Native FCM push enabled');
+        return;
+      }
+
+      // ── Web Push (VAPID) ───────────────────────────────────────────────────
       const permission = await Notification.requestPermission();
-      
+
       if (permission !== 'granted') {
         alert('Please enable notifications in your browser settings');
-        setLoading(false);
         return;
       }
 
       const registration = await navigator.serviceWorker.ready;
-      
+
       const subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(
@@ -48,10 +65,10 @@ export function PushNotificationSetup() {
       });
 
       setEnabled(true);
-      console.log('✅ Push notifications enabled');
+      console.log('✅ Web Push (VAPID) enabled');
     } catch (error) {
       console.error('❌ Push subscription failed:', error);
-      alert('Failed to enable notifications');
+      alert('Failed to enable notifications. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -61,9 +78,17 @@ export function PushNotificationSetup() {
     setLoading(true);
 
     try {
+      if (isNativePlatform()) {
+        // On native, just update local state — FCM token remains registered
+        // until the user uninstalls or clears app data
+        setEnabled(false);
+        console.log('🔕 Native push toggled off locally');
+        return;
+      }
+
       const registration = await navigator.serviceWorker.ready;
       const subscription = await registration.pushManager.getSubscription();
-      
+
       if (subscription) {
         await subscription.unsubscribe();
         await fetch('/api/push/unsubscribe', {
@@ -74,7 +99,7 @@ export function PushNotificationSetup() {
       }
 
       setEnabled(false);
-      console.log('🔕 Push notifications disabled');
+      console.log('🔕 Web Push (VAPID) disabled');
     } catch (error) {
       console.error('❌ Unsubscribe failed:', error);
     } finally {

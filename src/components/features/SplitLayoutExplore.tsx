@@ -118,6 +118,13 @@ interface SplitLayoutExploreProps {
     }
   }, [showHistory]);
 
+  // Close history panel when Explore nav link is clicked from anywhere
+  useEffect(() => {
+    const handler = () => setShowHistory(false);
+    window.addEventListener('edu:close-panels', handler);
+    return () => window.removeEventListener('edu:close-panels', handler);
+  }, []);
+
   const searchParams = useSearchParams();
   const isAutoQuiz = searchParams.get('autoQuiz') === '1';
 
