@@ -45,5 +45,11 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>EduExplorer needs access to your photo library to allow you to upload images in the app.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>EduExplorer uses the camera to capture photos for uploads.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>EduExplorer uses the microphone for recording audio if required.</string>
 </dict>
 </plist>
