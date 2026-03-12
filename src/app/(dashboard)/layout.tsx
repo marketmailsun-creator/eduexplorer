@@ -38,8 +38,8 @@ export default async function DashboardLayout({
     <div className="min-h-screen flex flex-col bg-gray-50">
       <CapacitorInit />
       <InactivityBanner daysInactive={daysInactive} />
-      <XPRedemptionBanner />
       <Header />
+      <XPRedemptionBanner />
       <main className="flex-1">
         {children}
       </main>

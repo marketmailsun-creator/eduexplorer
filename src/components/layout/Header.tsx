@@ -49,7 +49,7 @@ export function Header() {
   }, [session?.user?.id, pathname]);
 
   return (
-    <header className="border-b bg-white shadow-sm sticky top-0 z-50">
+    <header className="border-b bg-white shadow-sm sticky top-0 z-50" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
       <div className="container mx-auto px-4 py-3 flex items-center justify-between">
         {/* Logo */}
         <Link href="/explore" className="text-xl sm:text-2xl font-bold text-purple-600">
@@ -60,7 +60,13 @@ export function Header() {
           <>
             {/* Desktop Navigation */}
             <nav className="hidden md:flex items-center gap-2">
-              <Button variant="ghost" size="sm" asChild className={isActive('/explore') ? 'bg-purple-100 text-purple-700 hover:bg-purple-100' : ''}>
+              <Button
+                variant="ghost"
+                size="sm"
+                asChild
+                className={isActive('/explore') ? 'bg-purple-100 text-purple-700 hover:bg-purple-100' : ''}
+                onClick={() => window.dispatchEvent(new CustomEvent('edu:close-panels'))}
+              >
                 <Link href="/explore">
                   <Compass className="h-4 w-4 mr-1" />
                   Explore
@@ -238,7 +244,10 @@ export function Header() {
                           key={href}
                           href={href}
                           className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-white/80 transition-colors"
-                          onClick={() => setShowMobileMenu(false)}
+                          onClick={() => {
+                            setShowMobileMenu(false);
+                            if (href === '/explore') window.dispatchEvent(new CustomEvent('edu:close-panels'));
+                          }}
                         >
                           <div className={`w-9 h-9 rounded-xl ${bg} flex items-center justify-center flex-shrink-0`}>
                             <Icon className={`h-4.5 w-4.5 ${fg}`} style={{ width: '1.1rem', height: '1.1rem' }} />
