@@ -29,11 +29,10 @@ workflows:
             -configuration Release \
             -archivePath /tmp/eduexplorer.xcarchive \
             archive
-          xcodebuild \
-            -exportArchive \
-            -archivePath /tmp/eduexplorer.xcarchive \
-            -exportPath /tmp/ipa \
-            -exportOptionsPlist /tmp/ExportOptions.plist
+          xcode-project build-ipa \
+            --workspace "$XCODE_WORKSPACE" \
+            --scheme "$XCODE_SCHEME" \
+            --config Release
     artifacts:
       - /tmp/ipa/*.ipa
     publishing:
