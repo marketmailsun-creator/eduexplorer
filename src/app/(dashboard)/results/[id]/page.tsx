@@ -164,9 +164,9 @@ export default async function ResultsPage({
             <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-white leading-tight">
               {query.queryText}
             </h1>
-            <p className="text-xs sm:text-sm text-purple-200 mt-1">
+            {/* <p className="text-xs sm:text-sm text-purple-200 mt-1">
               Level: {levelLabel}
-            </p>
+            </p> */}
           </div>
 
           {/* Access context banners */}

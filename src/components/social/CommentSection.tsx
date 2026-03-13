@@ -205,7 +205,7 @@ export function CommentSection({ sharedContentId }: CommentSectionProps) {
                   value={newComment}
                   onChange={(e) => setNewComment(e.target.value)}
                   placeholder="Add a comment..."
-                  className="min-h-[80px] text-sm sm:text-base"
+                  className="min-h-[80px] text-base"
                 />
                 <div className="flex justify-end mt-2">
                   <Button

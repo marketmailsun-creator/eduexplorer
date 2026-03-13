@@ -5,6 +5,7 @@ workflows:
     integrations:
       app_store_connect: Codemagic Deploy Key
     environment:
+      node: 22.0.0
       ios_signing:
         distribution_type: app_store
         bundle_identifier: ai.eduexplorer.app

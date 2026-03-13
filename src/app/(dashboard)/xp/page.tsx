@@ -77,7 +77,7 @@ export default async function XPPage() {
         <CardContent className="space-y-3">
           <div className="flex items-center justify-between p-4 bg-gradient-to-r from-purple-50 to-yellow-50 rounded-lg border">
             <div>
-              <p className="font-semibold">100 XP = Rs.100 Amazon Voucher</p>
+              <p className="font-semibold">200 XP = Rs.100 Amazon Voucher</p>
               <p className="text-xs text-gray-500 mt-1">
                 Voucher will be emailed within 24 hours of approval. Admin-reviewed.
               </p>
