@@ -76,6 +76,17 @@ select {
   font-family: inherit;
 }
 
+/* Prevent iOS Safari auto-zoom when focusing inputs.
+   iOS zooms when input font-size < 16px; this rule enforces the minimum.
+   Applied only on mobile-width screens so desktop layout is unaffected. */
+@media screen and (max-width: 767px) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+}
+
 button {
   cursor: pointer;
 }

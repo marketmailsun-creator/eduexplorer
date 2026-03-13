@@ -50,7 +50,7 @@ export function XPRedeemButton({ canRedeem, reason, totalXP }: XPRedeemButtonPro
       {loading ? (
         <Loader2 className="h-4 w-4 animate-spin" />
       ) : (
-        `Redeem (${totalXP >= 100 ? '100 XP' : `${totalXP}/100`})`
+        `Redeem (${totalXP >= 200 ? '200 XP' : `${totalXP}/200`})`
       )}
     </Button>
   );

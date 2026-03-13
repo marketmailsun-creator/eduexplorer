@@ -77,7 +77,7 @@ export async function getXPLeaderboard(limit = 50) {
 }
 
 /**
- * Check if user can redeem XP (>= 100 XP, no pending redemption).
+ * Check if user can redeem XP (>= 200 XP, no pending redemption).
  */
 export async function canRedeemXP(
   userId: string
@@ -87,7 +87,7 @@ export async function canRedeemXP(
     prisma.xPRedemption.findFirst({ where: { userId, status: 'PENDING' } }),
   ]);
   if (!user || user.totalXP < 100) {
-    return { canRedeem: false, reason: 'Need at least 100 XP to redeem' };
+    return { canRedeem: false, reason: 'Need at least 200 XP to redeem' };
   }
   if (pending) {
     return { canRedeem: false, reason: 'You already have a pending redemption request' };
@@ -96,8 +96,8 @@ export async function canRedeemXP(
 }
 
 /**
- * Submit XP redemption request (100 XP -> Rs.100 Amazon voucher).
- * Deducts 100 XP immediately; creates redemption record.
+ * Submit XP redemption request (200 XP -> Rs.100 Amazon voucher).
+ * Deducts 200 XP immediately; creates redemption record.
  */
 export async function submitRedemption(
   userId: string
@@ -108,13 +108,13 @@ export async function submitRedemption(
   await prisma.$transaction([
     prisma.user.update({
       where: { id: userId },
-      data: { totalXP: { decrement: 100 } },
+      data: { totalXP: { decrement: 200 } },
     }),
     prisma.xPTransaction.create({
-      data: { userId, amount: -100, reason: 'redemption', metadata: { type: 'amazon_voucher' } },
+      data: { userId, amount: -200, reason: 'redemption', metadata: { type: 'amazon_voucher' } },
     }),
     prisma.xPRedemption.create({
-      data: { userId, xpAmount: 100 },
+      data: { userId, xpAmount: 200 },
     }),
   ]);
 

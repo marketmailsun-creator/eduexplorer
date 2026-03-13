@@ -36,13 +36,13 @@ export function XPRedemptionBanner() {
         >
           Redeem now →
         </Link>
-        <button
+        {/* <button
           onClick={dismiss}
           className="absolute right-4 top-1/2 -translate-y-1/2 p-1 hover:bg-white/20 rounded"
           aria-label="Dismiss"
         >
           <X className="h-4 w-4" />
-        </button>
+        </button> */}
       </div>
     </div>
   );
