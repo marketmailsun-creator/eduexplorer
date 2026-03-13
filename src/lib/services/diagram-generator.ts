@@ -23,6 +23,10 @@ function sanitizeMermaidCode(code: string): string {
   if (!code) return code;
   // Wrap labels containing special mermaid characters in double-quoted strings.
   let result = code.replace(/\[([^\]]*)\]/g, (_match: string, inner: string) => {
+    // Already a valid quoted label ["..."]: leave as-is to avoid corrupting it
+    if (inner.startsWith('"') && inner.endsWith('"') && inner.length >= 2) {
+      return `[${inner}]`;
+    }
     const escaped = inner.replace(/"/g, "'").replace(/`/g, "'");
     if (/[(){}|<>]/.test(escaped)) {
       return `["${escaped}"]`;

@@ -25,6 +25,18 @@ export function Header() {
     setShowDropdown(false);
   }, [pathname]);
 
+  // Lock body scroll when mobile menu is open
+  useEffect(() => {
+    if (showMobileMenu) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [showMobileMenu]);
+
   const isActive = (href: string) => pathname.startsWith(href);
 
   useEffect(() => {
@@ -49,7 +61,7 @@ export function Header() {
   }, [session?.user?.id, pathname]);
 
   return (
-    <header className="border-b bg-white shadow-sm sticky top-0 z-50" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+    <header className="border-b bg-white shadow-sm relative z-50" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
       <div className="container mx-auto px-4 py-3 flex items-center justify-between">
         {/* Logo */}
         <Link href="/explore" className="text-xl sm:text-2xl font-bold text-purple-600">
@@ -59,7 +71,7 @@ export function Header() {
         {session ? (
           <>
             {/* Desktop Navigation */}
-            <nav className="hidden md:flex items-center gap-2">
+            <nav className="hidden lg:flex items-center gap-2">
               <Button
                 variant="ghost"
                 size="sm"
@@ -106,7 +118,7 @@ export function Header() {
 
             {/* XP & Streak display */}
             {session && (
-              <div className="hidden md:flex items-center gap-2 px-2">
+              <div className="hidden lg:flex items-center gap-2 px-2">
                 <StreakBadge streak={currentStreak} />
                 <Link href="/xp">
                   <XPBar totalXP={totalXP} compact />
@@ -119,7 +131,7 @@ export function Header() {
               <Button
                 variant="ghost"
                 size="sm"
-                className="md:hidden"
+                className="lg:hidden"
                 onClick={() => setShowMobileMenu(!showMobileMenu)}
               >
                 {showMobileMenu ? (
@@ -209,7 +221,7 @@ export function Header() {
                   className="fixed inset-0 z-30"
                   onClick={() => setShowMobileMenu(false)}
                 />
-              <div className="absolute top-full left-0 right-0 z-40 bg-gradient-to-b from-purple-50 to-white border-b border-purple-100 shadow-xl md:hidden overflow-hidden">
+              <div className="absolute top-full left-0 right-0 z-40 bg-gradient-to-b from-purple-50 to-white border-b border-purple-100 shadow-xl lg:hidden overflow-y-auto max-h-[80vh]">
                 {/* User info section */}
                 <div className="flex items-center gap-3 px-4 py-4 border-b border-purple-100 bg-gradient-to-r from-indigo-50 to-purple-50">
                   <AvatarWithInitials
