@@ -49,7 +49,7 @@ workflows:
     environment:
       node: 22.0.0
       android_signing:
-        - eduexplorer_keystore
+        - eduexplorer
       vars:
         PACKAGE_NAME: "ai.eduexplorer.app"
     scripts:
