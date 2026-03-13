@@ -89,6 +89,10 @@ export function DiagramViewer({ diagrams }: DiagramViewerProps) {
       // Use quoted labels ["text"] which allow any content including () and {}
       let codeToRender = diagram.mermaidCode;
       codeToRender = codeToRender.replace(/\[([^\]]*)\]/g, (_match: string, inner: string) => {
+        // Already a valid quoted label ["..."]: leave as-is to avoid corrupting it
+        if (inner.startsWith('"') && inner.endsWith('"') && inner.length >= 2) {
+          return `[${inner}]`;
+        }
         const escaped = inner.replace(/"/g, "'").replace(/`/g, "'");
         if (/[(){}|<>]/.test(escaped)) {
           return `["${escaped}"]`;
@@ -115,6 +119,22 @@ export function DiagramViewer({ diagrams }: DiagramViewerProps) {
     renderDiagram(currentDiagram);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentIndex, retryCount]);
+
+  // Pre-render remaining diagrams sequentially in the background after mount
+  useEffect(() => {
+    if (diagrams.length <= 1) return;
+    let cancelled = false;
+    const prerender = async () => {
+      for (let i = 1; i < diagrams.length; i++) {
+        if (cancelled) break;
+        await new Promise(resolve => setTimeout(resolve, i * 400));
+        if (!cancelled) renderDiagram(diagrams[i]);
+      }
+    };
+    prerender();
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const nextDiagram = () => {
     if (currentIndex < diagrams.length - 1) {
@@ -226,7 +246,7 @@ export function DiagramViewer({ diagrams }: DiagramViewerProps) {
                 </div>
               ) : hasError ? (
                 <div className="text-center space-y-3 p-6">
-                  <p className="text-sm text-gray-500">Failed to render diagram</p>
+                  <p className="text-sm text-gray-500">Diagram could not be rendered</p>
                   <button
                     onClick={handleRetry}
                     className="flex items-center gap-2 px-4 py-2 text-sm bg-indigo-50 text-indigo-700 rounded-lg hover:bg-indigo-100 transition-colors mx-auto"
@@ -235,12 +255,6 @@ export function DiagramViewer({ diagrams }: DiagramViewerProps) {
                     <RefreshCw className="h-4 w-4" />
                     Retry
                   </button>
-                  {currentDiagram.mermaidCode && (
-                    <details className="text-left mt-2">
-                      <summary className="text-xs text-gray-400 cursor-pointer hover:text-gray-600">Show diagram code</summary>
-                      <pre className="text-xs bg-gray-50 p-3 rounded mt-2 overflow-auto max-h-40 text-left">{currentDiagram.mermaidCode}</pre>
-                    </details>
-                  )}
                 </div>
               ) : renderedSvg ? (
                 <div

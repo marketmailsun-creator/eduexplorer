@@ -46,7 +46,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="manifest" href="/manifest.json" />
         <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
       </head>
-      <body className="pb-16 md:pb-0"> {/* Space for bottom nav */}
+      <body className="pb-16 lg:pb-0"> {/* Space for bottom nav */}
         <SessionProvider>
           {children}
         </SessionProvider>
