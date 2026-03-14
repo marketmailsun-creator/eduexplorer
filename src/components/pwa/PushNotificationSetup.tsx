@@ -1,11 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Bell, BellOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 export function PushNotificationSetup() {
   const [enabled, setEnabled] = useState(false);
+  const [denied, setDenied] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const urlBase64ToUint8Array = (base64String: string) => {
@@ -22,6 +23,34 @@ export function PushNotificationSetup() {
   const isNativePlatform = () =>
     typeof window !== 'undefined' && !!(window as any).Capacitor?.isNativePlatform();
 
+  // Check existing permission state on mount so button reflects reality
+  useEffect(() => {
+    const checkPermissions = async () => {
+      try {
+        if (isNativePlatform()) {
+          const { PushNotifications } = await import('@capacitor/push-notifications');
+          const status = await PushNotifications.checkPermissions();
+          if (status.receive === 'granted') setEnabled(true);
+          if (status.receive === 'denied') setDenied(true);
+        } else if (typeof Notification !== 'undefined') {
+          if (Notification.permission === 'denied') {
+            setDenied(true);
+          } else if (Notification.permission === 'granted') {
+            // Also verify there is an active VAPID subscription
+            const reg = await navigator.serviceWorker?.ready;
+            if (reg) {
+              const sub = await reg.pushManager?.getSubscription();
+              if (sub) setEnabled(true);
+            }
+          }
+        }
+      } catch {
+        // Non-blocking — if check fails, default to not-enabled state
+      }
+    };
+    checkPermissions();
+  }, []);
+
   const subscribe = async () => {
     setLoading(true);
 
@@ -30,10 +59,11 @@ export function PushNotificationSetup() {
       if (isNativePlatform()) {
         const { PushNotifications } = await import('@capacitor/push-notifications');
         const { receive } = await PushNotifications.requestPermissions();
-        if (receive !== 'granted') {
-          alert('Please enable notifications in your device Settings → EduExplorer → Notifications');
+        if (receive === 'denied') {
+          setDenied(true);
           return;
         }
+        if (receive !== 'granted') return;
         await PushNotifications.register();
         setEnabled(true);
         console.log('✅ Native FCM push enabled');
@@ -41,12 +71,19 @@ export function PushNotificationSetup() {
       }
 
       // ── Web Push (VAPID) ───────────────────────────────────────────────────
-      const permission = await Notification.requestPermission();
-
-      if (permission !== 'granted') {
-        alert('Please enable notifications in your browser settings');
+      if (typeof Notification === 'undefined') {
+        alert('Push notifications are not supported in this browser.');
         return;
       }
+
+      const permission = await Notification.requestPermission();
+
+      if (permission === 'denied') {
+        setDenied(true);
+        return;
+      }
+
+      if (permission !== 'granted') return;
 
       const registration = await navigator.serviceWorker.ready;
 
@@ -66,9 +103,9 @@ export function PushNotificationSetup() {
 
       setEnabled(true);
       console.log('✅ Web Push (VAPID) enabled');
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Push subscription failed:', error);
-      alert('Failed to enable notifications. Please try again.');
+      alert(`Failed to enable notifications: ${error?.message ?? 'unknown error'}`);
     } finally {
       setLoading(false);
     }
@@ -80,7 +117,6 @@ export function PushNotificationSetup() {
     try {
       if (isNativePlatform()) {
         // On native, just update local state — FCM token remains registered
-        // until the user uninstalls or clears app data
         setEnabled(false);
         console.log('🔕 Native push toggled off locally');
         return;
@@ -106,6 +142,16 @@ export function PushNotificationSetup() {
       setLoading(false);
     }
   };
+
+  // Permission was explicitly denied by the user in system settings
+  if (denied) {
+    return (
+      <p className="text-xs text-amber-600 leading-snug">
+        Notifications blocked — enable in{' '}
+        <strong>Settings → EduExplorer → Notifications</strong>
+      </p>
+    );
+  }
 
   return (
     <Button

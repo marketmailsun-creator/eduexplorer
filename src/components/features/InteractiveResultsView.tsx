@@ -327,7 +327,7 @@ export function InteractiveResultsView({
       
       {/* LEFT COLUMN (Desktop) / TOP SECTION (Mobile) - Article Content */}
       <div className={`flex flex-col gap-6 ${presentationSize === 'maximized' || flashcardsSize === 'maximized' || quizSize === 'maximized' ? 'lg:col-span-2' : ''}`}>
-      {/* LEFT COLUMN */}
+      {/* Explanation */}
          <Card className="w-full overflow-hidden">
           <div className="h-1.5 bg-gradient-to-r from-blue-500 to-indigo-600" />
           <CardHeader className="pb-3 px-4 bg-blue-50/60">

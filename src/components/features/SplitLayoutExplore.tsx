@@ -658,7 +658,7 @@ interface SplitLayoutExploreProps {
             </div>
 
             {/* Example Topics - Mobile Optimized */}
-            {/* <div className="mt-4 sm:mt-6 text-center">
+            { <div className="mt-4 sm:mt-6 text-center">
               <p className="text-xs sm:text-sm font-medium text-gray-700 mb-2 sm:mb-3">
                 <span className="hidden sm:inline">Try these popular topics:</span>
                 <span className="sm:hidden">Try these:</span>
@@ -674,7 +674,7 @@ interface SplitLayoutExploreProps {
                   </button>
                 ))}
               </div>
-            </div> */}
+            </div> }
             {/* Trending topics */}
             <div className="mt-4 sm:mt-6">
               <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
@@ -714,7 +714,7 @@ interface SplitLayoutExploreProps {
 
             {/* 7 Formats - Mobile Optimized Grid */}
             <div className="bg-white rounded-xl sm:rounded-2xl shadow-lg p-3 sm:p-6 border border-gray-100">
-              <h3 className="text-base sm:text-lg font-bold text-gray-900 mb-3 sm:mb-4">7 Learning Formats</h3>
+              <h3 className="text-base sm:text-lg font-bold text-gray-900 mb-3 sm:mb-4">6 Learning Formats</h3>
               <div className="grid grid-cols-3 sm:grid-cols-3 gap-1.5 sm:gap-2">
                 {features.map((feature, idx) => (
                   <div key={idx} className="flex flex-col items-center text-center p-2 sm:p-2.5 rounded-lg sm:rounded-xl bg-gray-50 hover:bg-gradient-to-br hover:from-gray-50 hover:to-blue-50 transition-all group">
