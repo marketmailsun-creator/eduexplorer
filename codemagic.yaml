@@ -57,6 +57,12 @@ workflows:
     scripts:
       - name: Install Node dependencies
         script: npm ci
+      - name: Set up signing properties
+        script: |
+          echo "EDUEXPLORER_STORE_FILE=$CM_KEYSTORE_PATH" >> android/gradle.properties
+          echo "EDUEXPLORER_STORE_PASSWORD=$CM_KEYSTORE_PASSWORD" >> android/gradle.properties
+          echo "EDUEXPLORER_KEY_ALIAS=$CM_KEY_ALIAS" >> android/gradle.properties
+          echo "EDUEXPLORER_KEY_PASSWORD=$CM_KEY_PASSWORD" >> android/gradle.properties
       - name: Capacitor sync
         script: npx cap sync android
       - name: Set up local.properties
