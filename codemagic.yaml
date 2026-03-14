@@ -50,6 +50,7 @@ workflows:
       groups:
         - google_play
       node: 22.0.0
+      java: 21
       android_signing:
         - eduexplorer
       vars:
