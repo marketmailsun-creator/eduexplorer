@@ -31,7 +31,7 @@ export default async function LibraryPage() {
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
       {/* Gradient hero header */}
-      <div className="bg-gradient-to-r from-violet-700 via-purple-700 to-indigo-700 px-4 py-5 sticky top-0 z-10 shadow-lg">
+      <div className="bg-gradient-to-r from-violet-700 via-purple-700 to-indigo-700 px-4 py-5 shadow-lg">
         <div className="max-w-2xl mx-auto">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">

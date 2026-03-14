@@ -48,6 +48,16 @@ export default async function ExplorePage() {
             <p className="text-sm sm:text-base text-purple-100 max-w-xl mx-auto mb-4 sm:mb-7">
               Ask any question — get articles, quizzes, audio, flashcards & more in seconds
             </p>
+            {/* <div className="flex flex-wrap justify-center gap-1.5 max-w-lg mx-auto mb-4 sm:mb-7">
+              {['Article', 'Audio', 'Flashcards', 'Quiz', 'Diagrams', 'Concept Map', 'Presentation'].map(format => (
+                <span
+                  key={format}
+                  className="px-2.5 py-0.5 bg-white/20 backdrop-blur-sm rounded-full text-[10px] sm:text-xs font-medium text-white/90"
+                >
+                  {format}
+                </span>
+              ))}
+            </div> */}
 
             {/* Stats row */}
             <div className="flex items-center justify-center gap-4 sm:gap-10">

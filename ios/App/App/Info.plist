@@ -51,5 +51,7 @@
 	<string>EduExplorer uses the camera to capture photos for uploads.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>EduExplorer uses the microphone for recording audio if required.</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 </dict>
 </plist>

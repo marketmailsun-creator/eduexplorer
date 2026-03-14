@@ -149,7 +149,7 @@ export default async function ResultsPage({
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header Section — gradient design */}
-      <div className="bg-gradient-to-r from-violet-700 via-purple-700 to-indigo-700 px-4 py-4 sticky top-0 z-10 shadow-lg">
+      <div className="bg-gradient-to-r from-violet-700 via-purple-700 to-indigo-700 px-4 py-4 shadow-lg">
         <div className="max-w-7xl mx-auto">
           {/* Back Button */}
           <Link href="/explore">
