@@ -1,4 +1,3 @@
-import { createHash } from 'crypto';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { prisma } from '../db/prisma';
 import { formatForDisplay } from '../utils/text-cleaning-utils';
@@ -18,37 +17,6 @@ const genAI = GOOGLE_API_KEY ? new GoogleGenerativeAI(GOOGLE_API_KEY) : null;
 const MODEL = 'gemini-2.5-flash';
 
 console.log('🔑 Research Service - Google API:', GOOGLE_API_KEY ? '✅ SET' : '❌ MISSING');
-
-function contentFingerprint(text: string): string {
-  return createHash('sha256').update(text).digest('hex').slice(0, 16);
-}
-
-function extractTopicFromContent(content: string, fallback: string): string {
-  const GENERIC_WORDS = /^(introduction|overview|summary|conclusion|background|context|section|chapter|definition|what is)/i;
-  const lines = content.split('\n').map(l => l.trim()).filter(Boolean);
-  for (const line of lines.slice(0, 10)) {
-    if (
-      line.length >= 4 &&
-      line.length <= 80 &&
-      !/^[\d•\-*#>]/.test(line) &&
-      !GENERIC_WORDS.test(line)
-    ) {
-      return line;
-    }
-  }
-  return fallback;
-}
-
-function stripMediaWrappers(text: string): string {
-  return text
-    .replace(/^Please analyze and explain the following:\s*/i, '')
-    .replace(/\[Image content:\s*/g, '')
-    .replace(/\[Images content:\s*/g, '')
-    .replace(/\[Document "[^"]*" content:\s*/g, '')
-    .replace(/\[Note:[^\]]*\]/g, '')
-    .replace(/\]/g, '')
-    .trim();
-}
 
 function getFriendlyErrorMessage(error: unknown): string {
   const err = error as { status?: number; code?: string; message?: string };
@@ -70,21 +38,15 @@ function getFriendlyErrorMessage(error: unknown): string {
 
 export async function processResearchQuery(params: {
   userId: string;
-  queryText: string;       // short, human-readable — stored in DB and displayed in UI
+  queryText: string;
   learningLevel: string;
-  researchText?: string;   // optional enriched text (e.g. with image analysis context) — used for Gemini research only
 }): Promise<ResearchResult> {
 
-  const { userId, queryText, learningLevel, researchText } = params;
-  // Use researchText for the actual Gemini call if provided; fall back to queryText
-  const textForResearch = researchText ?? queryText;
+  const { userId, queryText, learningLevel } = params;
 
   console.log('Processing research query:', { userId, queryText, learningLevel });
-  // Check cache first — use content fingerprint for media queries to avoid collisions
-  const cacheFingerprint = researchText
-    ? contentFingerprint(textForResearch)
-    : queryText;
-  const cacheKey = `research:${userId}:${cacheFingerprint}:${learningLevel}`;
+  // Check cache first
+  const cacheKey = `research:${userId}:${queryText}:${learningLevel}`;
   const cached = await getCached<ResearchResult>(cacheKey);
 
   if (cached) {
@@ -138,10 +100,7 @@ export async function processResearchQuery(params: {
     try {
       console.log('🔍 Calling Gemini with Google Search grounding...');
       await incrementUsageCounter('gemini');
-      const geminiInput = researchText
-        ? `Research and explain the following content found in a student's uploaded file:\n\n${stripMediaWrappers(textForResearch)}`
-        : formatForDisplay(textForResearch);
-      const result = await model.generateContent(geminiInput);
+      const result = await model.generateContent(formatForDisplay(queryText));
       const response = result.response;
       content = response.text();
 
@@ -163,7 +122,7 @@ export async function processResearchQuery(params: {
       // All research failed — delete the query record so it doesn't pollute history
       await prisma.query.delete({ where: { id: query.id } });
       const errMsg = getFriendlyErrorMessage(apiError);
-      await sendQuotaAlertOnce('gemini', `Gemini research failed.\nError: ${errMsg}\nQuery: ${textForResearch}`);
+      await sendQuotaAlertOnce('gemini', `Gemini research failed.\nError: ${errMsg}\nQuery: ${queryText}`);
       throw new Error(errMsg);
     }
 
@@ -183,17 +142,12 @@ export async function processResearchQuery(params: {
       },
     });
 
-    // Compute the real topic once — used for both DB update and result
-    const detectedTopic = researchText
-      ? extractTopicFromContent(cleanedContent, queryText)
-      : queryText;
-
     // Update query status
     await prisma.query.update({
       where: { id: query.id },
       data: {
         status: 'completed',
-        topicDetected: detectedTopic,
+        topicDetected: queryText,
       },
     });
 
@@ -202,7 +156,7 @@ export async function processResearchQuery(params: {
       queryId: query.id,
       content: cleanedContent,
       sources: sources,
-      topic: detectedTopic,
+      topic: queryText,
       complexity: learningLevel,
       fromCache: false,
     };

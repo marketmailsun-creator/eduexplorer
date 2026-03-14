@@ -45,7 +45,6 @@ const CATEGORIES = [
 export function TopicDiscoveryHub() {
   const router = useRouter();
   const [recentTopics, setRecentTopics] = useState<string[]>([]);
-  const [trendingTopics, setTrendingTopics] = useState<string[]>([]);
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
 
   useEffect(() => {
@@ -67,44 +66,12 @@ export function TopicDiscoveryHub() {
       .catch(() => {});
   }, []);
 
-  useEffect(() => {
-    fetch('/api/query/trending')
-      .then(r => r.ok ? r.json() : { topics: [] })
-      .then(({ topics }) => {
-        setTrendingTopics((topics ?? []).slice(0, 8));
-      })
-      .catch(() => {});
-  }, []);
-
   const navigate = (topic: string) => {
     router.push(`/explore?q=${encodeURIComponent(topic)}`);
   };
 
   return (
     <div className="w-full mb-8 space-y-6">
-      {/* Trending Now — platform-wide */}
-      {trendingTopics.length > 0 && (
-        <div>
-          <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
-            🔥 Trending Now
-          </h2>
-          <div className="flex flex-wrap gap-2">
-            {trendingTopics.map(topic => (
-              <button
-                key={topic}
-                onClick={() => navigate(topic)}
-                className="px-3 py-1.5 text-sm font-medium bg-gradient-to-r from-orange-50 to-amber-50
-                           border border-orange-200 rounded-full text-orange-700
-                           hover:from-orange-100 hover:to-amber-100 hover:border-orange-400
-                           transition-colors shadow-sm"
-              >
-                {topic}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* Recent for this user */}
       {recentTopics.length > 0 && (
         <div>

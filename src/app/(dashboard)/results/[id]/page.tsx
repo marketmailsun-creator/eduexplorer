@@ -136,24 +136,15 @@ export default async function ResultsPage({
     ? (query.researchData as any).rawData.citations
     : [];
 
-  // Clean title for display — handles old records that stored the full image analysis blob
-  function getDisplayTitle(queryText: string, topicDetected?: string | null): string {
-    if (
-      queryText.includes('[Image content:') ||
-      queryText.includes('[Document ') ||
-      queryText.startsWith('Please analyze and explain the following')
-    ) {
-      if (topicDetected && topicDetected.length < 120 && !topicDetected.includes('[Image content:')) {
-        return topicDetected;
-      }
-      return 'Image Analysis';
-    }
-    if (queryText.length > 120) {
-      return queryText.slice(0, 117) + '…';
-    }
-    return queryText;
-  }
-  const displayTitle = getDisplayTitle(query.queryText, query.topicDetected);
+  // Friendly label for the complexity level displayed in the header
+  const LEVEL_LABELS: Record<string, string> = {
+    elementary: 'Elementary School',
+    'middle-school': 'Middle School',
+    'high-school': 'High School',
+    college: 'College',
+    advanced: 'Advanced / Research',
+  };
+  const levelLabel = LEVEL_LABELS[query.complexityLevel ?? ''] ?? (query.complexityLevel || 'College');
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -171,7 +162,7 @@ export default async function ResultsPage({
           {/* Title */}
           <div>
             <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-white leading-tight">
-              {displayTitle}
+              {query.queryText}
             </h1>
             {/* <p className="text-xs sm:text-sm text-purple-200 mt-1">
               Level: {levelLabel}
@@ -204,9 +195,9 @@ export default async function ResultsPage({
           <div className="flex gap-2 mt-3 flex-wrap">
             {isOwner && (
               <>
-                <ShareButton queryId={query.id} title={displayTitle} />
+                <ShareButton queryId={query.id} title={query.queryText} />
                 <WhatsAppShareButton
-                  topic={displayTitle}
+                  topic={query.queryText}
                   summary={shareableText}
                   queryId={query.id}
                 />
@@ -243,7 +234,7 @@ export default async function ResultsPage({
           />
         </div>
         <div className="px-4 sm:px-6 pb-10 max-w-7xl mx-auto">
-          <WhatToLearnNext queryId={id} currentTopic={displayTitle} hasQuiz={hasQuiz} />
+          <WhatToLearnNext queryId={id} currentTopic={query.queryText} hasQuiz={hasQuiz} />
         </div>
         {sharedContent && (
           <div className="mt-8">

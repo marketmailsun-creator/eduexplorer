@@ -163,39 +163,6 @@ export async function POST(req: NextRequest) {
       console.log('✅ Audio context noted');
     }
 
-    // Validate extracted media content is meaningful before proceeding to research
-    if (hasMediaInput && mediaContextParts.length === 0) {
-      // Media was attached but all extractions threw exceptions — already returned 422 above
-      return NextResponse.json(
-        { error: "We couldn't read your attachment. Please check the file is readable, or type your question directly." },
-        { status: 422 }
-      );
-    }
-
-    if (hasMediaInput && mediaContextParts.length > 0) {
-      const FAILURE_MARKERS = ['Unable to extract PDF text', 'Unable to extract'];
-      const extractedContent = mediaContextParts.join(' ');
-      const isFailedExtraction = FAILURE_MARKERS.some(marker => extractedContent.includes(marker));
-
-      // Strip wrappers to measure real content length
-      const contentWithoutWrappers = extractedContent
-        .replace(/\[Image content:\s*/g, '')
-        .replace(/\[Document "[^"]*" content:\s*/g, '')
-        .replace(/\[Images content:\s*/g, '')
-        .replace(/\[Note:[^\]]*\]/g, '')
-        .replace(/\]/g, '')
-        .trim();
-
-      if (isFailedExtraction || contentWithoutWrappers.length < 50) {
-        return NextResponse.json(
-          {
-            error: "We couldn't read the content of your attachment. Please make sure your document has readable text (not a scanned image without text), or type your question directly.",
-          },
-          { status: 422 }
-        );
-      }
-    }
-
     // Append all media context to the query
     // Build final enriched query
     if (mediaContextParts.length > 0) {
@@ -253,25 +220,10 @@ export async function POST(req: NextRequest) {
       console.log('⏩ Skipping full moderation (adult user, no flags)');
     }
 
-    // Derive a short, human-readable title for DB storage
-    let shortDisplayText: string;
-    if (query.trim().length >= 3) {
-      shortDisplayText = query.trim().slice(0, 200);
-    } else if (imageFiles.length > 0) {
-      shortDisplayText = 'Image Analysis';
-    } else if (docFiles.length > 0) {
-      shortDisplayText = 'Document Analysis';
-    } else if (audioFile && audioFile.size > 0) {
-      shortDisplayText = 'Voice Query';
-    } else {
-      shortDisplayText = 'Query';
-    }
-
-    // ✅ Process: store short title in DB, use full enriched text for research
+    // ✅ Process with enriched query (includes media context)
     const result = await processResearchQuery({
       userId: session.user.id,
-      queryText: shortDisplayText,
-      researchText: enrichedQuery,
+      queryText: enrichedQuery,
       learningLevel,
     });
 
@@ -279,7 +231,7 @@ export async function POST(req: NextRequest) {
       if (autoQuizFlag) {
         // Pre-generate quiz server-side so results page loads with quiz already available.
         // Eliminates client-side router.refresh() call in InteractiveResultsView.
-        await generateAndSaveQuizForQuery(result.queryId, learningLevel);
+        await generateAndSaveQuizForQuery(result.queryId, enrichedQuery, learningLevel);
       } else {
         await generateContentForQuery(result.queryId);
       }

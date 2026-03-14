@@ -45,11 +45,9 @@ export async function generateFlashcards(
     const query = await prisma.query.findUnique({ where: { id: queryId } });
     if (!query) throw new Error('Query not found');
 
-    const effectiveTopic = (query as any).topicDetected || query.queryText;
-
     // Generate flashcards using Gemini
     const deck = await generateFlashcardDeck(
-      effectiveTopic,
+      query.queryText,
       articleText,
       cardCount,
       level
@@ -60,7 +58,7 @@ export async function generateFlashcards(
       data: {
         queryId,
         contentType: 'flashcards',
-        title: `${effectiveTopic} - Flashcards`,
+        title: `${query.queryText} - Flashcards`,
         data: {
           status: 'completed',
           deck: (deck as unknown) as Prisma.InputJsonValue,
