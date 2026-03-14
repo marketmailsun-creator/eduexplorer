@@ -1,0 +1,37 @@
+{
+	"appId": "ai.eduexplorer.app",
+	"appName": "EduExplorer",
+	"webDir": "out",
+	"server": {
+		"url": "https://www.eduexplorer.ai",
+		"cleartext": false
+	},
+	"plugins": {
+		"PushNotifications": {
+			"presentationOptions": [
+				"badge",
+				"sound",
+				"alert"
+			]
+		},
+		"Camera": {
+			"permissions": [
+				"camera",
+				"photos"
+			]
+		},
+		"StatusBar": {
+			"style": "default",
+			"backgroundColor": "#ffffff"
+		}
+	},
+	"ios": {
+		"contentInset": "automatic",
+		"allowsLinkPreview": false
+	},
+	"android": {
+		"allowMixedContent": false,
+		"captureInput": true,
+		"webContentsDebuggingEnabled": false
+	}
+}
