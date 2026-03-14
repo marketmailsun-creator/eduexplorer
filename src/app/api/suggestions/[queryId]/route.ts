@@ -41,11 +41,18 @@ export async function GET(
     // Fetch the topic from DB
     const query = await prisma.query.findUnique({
       where: { id: queryId },
-      select: { queryText: true, topicDetected: true },
+      select: {
+        queryText: true,
+        topicDetected: true,
+        researchData: { select: { summary: true } },
+      },
     });
     if (!query) return NextResponse.json({ suggestions: [] });
 
     const topic = query.topicDetected || query.queryText;
+    const contentContext = (query.researchData as any)?.summary
+      ? `\n\nContent studied: "${((query.researchData as any).summary as string).slice(0, 400)}"`
+      : '';
     console.log('🤖 Generating suggestions with Groq for topic:', topic);
 
     // ✅ Call Groq — same API shape as OpenAI
@@ -60,7 +67,7 @@ export async function GET(
         },
         {
           role: 'user',
-          content: `A student just finished learning about: "${topic}"
+          content: `A student just finished learning about: "${topic}"${contentContext}
 
 Suggest 4 related topics they should explore next.
 Return ONLY this JSON array with no other text:

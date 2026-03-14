@@ -52,17 +52,18 @@ export async function POST(req: NextRequest) {
     console.log('✅ Found article:', articleText.length, 'characters');
 
     // Generate presentation
+    const effectiveTopic = (query as any).topicDetected || query.queryText;
     let presentation;
     try {
       presentation = await generatePresentation(
-        query.queryText,
+        effectiveTopic,
         articleText,
         query.complexityLevel || 'college'
       );
     } catch (error) {
       console.warn('⚠️ Gemini generation failed, using fallback');
       presentation = generateFallbackPresentation(
-        query.queryText,
+        effectiveTopic,
         articleText,
         query.complexityLevel || 'college'
       );
@@ -73,7 +74,7 @@ export async function POST(req: NextRequest) {
       data: {
         queryId,
         contentType: 'presentation',
-        title: `${query.queryText} - Presentation`,
+        title: `${effectiveTopic} - Presentation`,
         data: {
           status: 'completed',
           presentation: (presentation as unknown) as Prisma.InputJsonValue,

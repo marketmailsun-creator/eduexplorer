@@ -131,9 +131,11 @@ export async function generateContentForQuery(queryId: string) {
 
   console.log(`📊 Research input: ${fullResearchContent.length} chars, ${sourceUrls.length} sources`);
 
+  const effectiveTopic = (research.query as any).topicDetected || research.query.queryText;
+
   const article = await generateArticleWithGroq(
     fullResearchContent,
-    research.query.queryText,
+    effectiveTopic,
     research.query.complexityLevel || 'college',
     sourceUrls
   );
@@ -142,7 +144,7 @@ export async function generateContentForQuery(queryId: string) {
     data: {
       queryId,
       contentType: 'article',
-      title: research.query.queryText,
+      title: effectiveTopic,
       data: { text: article },
     },
   });

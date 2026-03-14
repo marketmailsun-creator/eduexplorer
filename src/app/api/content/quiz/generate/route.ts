@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
     // Get the query
     const query = await prisma.query.findUnique({
       where: { id: queryId },
-      select: { id: true, userId: true, queryText: true, complexityLevel: true },
+      select: { id: true, userId: true, queryText: true, topicDetected: true, complexityLevel: true },
     });
 
     if (!query || query.userId !== session.user.id) {
@@ -78,8 +78,9 @@ export async function POST(req: NextRequest) {
     const setNumber = existingQuizzes.length + 1;
 
     // Generate new topic-first quiz (NOT from article text)
+    const effectiveTopic = query.topicDetected || query.queryText;
     const quiz = await generateTopicQuiz(
-      query.queryText,
+      effectiveTopic,
       numQuestions,
       query.complexityLevel || 'college',
       previousQuestions,
@@ -91,7 +92,7 @@ export async function POST(req: NextRequest) {
       data: {
         queryId,
         contentType: 'quiz',
-        title: `${query.queryText} - Quiz Set ${setNumber}`,
+        title: `${effectiveTopic} - Quiz Set ${setNumber}`,
         data: {
           status: 'completed',
           setNumber,

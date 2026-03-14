@@ -70,14 +70,15 @@ export async function POST(req: NextRequest) {
     console.log('✅ Found article:', articleText.length, 'characters');
 
     // Generate diagrams
-    const diagrams = await generateDiagrams(query.queryText, articleText, count);
+    const effectiveTopic = (query as any).topicDetected || query.queryText;
+    const diagrams = await generateDiagrams(effectiveTopic, articleText, count);
 
     // Save to database
     const diagramContent = await prisma.content.create({
       data: {
         queryId,
         contentType: 'diagrams',
-        title: `${query.queryText} - Diagrams`,
+        title: `${effectiveTopic} - Diagrams`,
         data: {
           status: 'completed',
           diagrams: (diagrams as unknown) as Prisma.InputJsonValue,

@@ -85,7 +85,7 @@ export default async function ExplorePage() {
           lessonsLimit={lessonsLimit}
         />
         <CurriculumSelector />
-        {/* <TopicDiscoveryHub /> */}
+        <TopicDiscoveryHub />
         <SplitLayoutExplore
           onboardingDone={user?.onboardingDone ?? false}
           userName={user?.name ?? ''}

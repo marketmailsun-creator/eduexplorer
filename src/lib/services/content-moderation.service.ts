@@ -105,9 +105,7 @@ export function getModerationErrorMessage(
   const isMinor = userAge && userAge < 18;
 
   const messages: Record<string, string> = {
-    sexual: isMinor
-      ? "This content is not appropriate for users under 18. Please ask about educational topics suitable for your age."
-      : "This content contains adult themes that we don't generate educational materials for. Please try a different topic.",
+    sexual: "This search contains adult content. EduExplorer is an educational platform — please search for a subject like 'Biology', 'History', or 'Mathematics' instead.",
 
     violent: "This content contains violent or graphic themes. Please ask about educational topics that don't involve violence or harm.",
 
@@ -125,7 +123,7 @@ export function getModerationErrorMessage(
   };
 
   return messages[result.category || ''] || result.reason ||
-    "This query doesn't seem appropriate for our educational platform. Please try asking about a different topic.";
+    "Please search for an educational subject. EduExplorer generates learning content for academic topics only.";
 }
 
 /**
@@ -135,24 +133,37 @@ export function getModerationErrorMessage(
 export function quickModerationCheck(query: string): boolean {
   const lowercaseQuery = query.toLowerCase();
 
-  // Common inappropriate keywords (basic list)
+  // Common inappropriate keywords (expanded list)
   const blockedKeywords = [
-    // Sexual content
-    'porn', 'sex', 'xxx', 'nude', 'naked', 'erotic',
+    // Sexual / adult content — phrases first to avoid false positives
+    'sex video', 'porn', 'pornography', 'xxx', 'nude', 'naked', 'erotic',
+    'adult content', 'adult film', 'sexy', 'sexual', 'hentai', 'nsfw',
+    'onlyfans', 'cam girl', 'escort', 'prostitut',
     // Violence
-    'kill', 'murder', 'suicide', 'bomb', 'weapon',
-    // Drugs (allow medical/educational context)
-    'cocaine', 'heroin', 'meth',
-    // Hate speech indicators
-    'hate', 'racist', 'nazi',
+    'kill', 'murder', 'suicide', 'bomb making', 'how to make a bomb',
+    'weapon instructions', 'assassination', 'mass shooting',
+    // Drugs (non-educational)
+    'cocaine', 'heroin', 'methamphetamine', 'meth', 'how to make drugs',
+    'drug synthesis', 'crystal meth',
+    // Hate speech
+    'racist', 'nazi', 'white supremac', 'ethnic cleansing',
+    // Self-harm
+    'how to self harm', 'how to cut myself', 'how to kill myself',
   ];
 
-  // Check for exact matches or word boundaries
+  // Phrases need substring match; single words need word boundaries
   for (const keyword of blockedKeywords) {
-    const regex = new RegExp(`\\b${keyword}\\b`, 'i');
-    if (regex.test(lowercaseQuery)) {
-      console.log('🚫 Quick moderation: Blocked keyword detected:', keyword);
-      return true; // Might be inappropriate
+    if (keyword.includes(' ')) {
+      if (lowercaseQuery.includes(keyword)) {
+        console.log('🚫 Quick moderation: Blocked phrase detected:', keyword);
+        return true;
+      }
+    } else {
+      const regex = new RegExp(`\\b${keyword}\\b`, 'i');
+      if (regex.test(lowercaseQuery)) {
+        console.log('🚫 Quick moderation: Blocked keyword detected:', keyword);
+        return true;
+      }
     }
   }
 

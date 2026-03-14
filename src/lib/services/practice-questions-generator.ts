@@ -197,7 +197,6 @@ export async function generatePracticeQuestions(
  */
 export async function generateAndSaveQuizForQuery(
   queryId: string,
-  queryText: string,
   complexityLevel: string,
 ): Promise<void> {
   // Idempotent check
@@ -209,9 +208,16 @@ export async function generateAndSaveQuizForQuery(
     return;
   }
 
-  console.log(`🧠 Pre-generating quiz for autoQuiz: ${queryText}`);
+  // Fetch the real topic from DB (topicDetected is set by research service before this is called)
+  const queryRecord = await prisma.query.findUnique({
+    where: { id: queryId },
+    select: { topicDetected: true, queryText: true },
+  });
+  const topic = queryRecord?.topicDetected || queryRecord?.queryText || 'Unknown Topic';
+
+  console.log(`🧠 Pre-generating quiz for autoQuiz: ${topic}`);
   const quiz = await generateTopicQuiz(
-    queryText,
+    topic,
     10,
     complexityLevel || 'college',
     [],
@@ -222,7 +228,7 @@ export async function generateAndSaveQuizForQuery(
     data: {
       queryId,
       contentType: 'quiz',
-      title: `${queryText} - Quiz Set 1`,
+      title: `${topic} - Quiz Set 1`,
       data: {
         status: 'completed',
         setNumber: 1,
