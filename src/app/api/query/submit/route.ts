@@ -1,7 +1,39 @@
 import { NextRequest, NextResponse } from 'next/server';
+
+// Helper: convert Vision JSON output to plain readable text for research context.
+// Prevents Gemini Research (text-only) from misinterpreting [Image content:] as a media attachment.
+function extractVisionTextForResearch(visionOutput: string): string {
+  try {
+    let jsonText = visionOutput.trim();
+    const fenceMatch = jsonText.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/);
+    if (fenceMatch) jsonText = fenceMatch[1].trim();
+    if (!jsonText.startsWith('{')) {
+      const start = jsonText.indexOf('{');
+      const end = jsonText.lastIndexOf('}');
+      if (start !== -1 && end !== -1) jsonText = jsonText.slice(start, end + 1);
+    }
+    const parsed = JSON.parse(jsonText);
+    if (parsed.sections && Array.isArray(parsed.sections)) {
+      const parts: string[] = [];
+      if (parsed.subject_area) parts.push(`Subject: ${parsed.subject_area}`);
+      parsed.sections.forEach((s: any) => {
+        if (s.title) parts.push(s.title);
+        if (s.content) parts.push(s.content);
+        s.subsections?.forEach((sub: any) => {
+          if (sub.title) parts.push(sub.title);
+          if (sub.content) parts.push(sub.content);
+        });
+      });
+      return parts.join('\n').slice(0, 3000);
+    }
+  } catch {
+    // fall through to plain text
+  }
+  return visionOutput.replace(/[{}"]/g, '').slice(0, 3000);
+}
 import { auth } from '@/auth';
 import { processResearchQuery } from '@/lib/services/research.service';
-import { generateContentForQuery } from '@/lib/services/content.service';
+import { generateContentForQuery, generateContentFromImageAnalysis } from '@/lib/services/content.service';
 import { generateAndSaveQuizForQuery } from '@/lib/services/practice-questions-generator';
 import { moderateContent, getModerationErrorMessage, quickModerationCheck } from '@/lib/services/content-moderation.service';
 import { analyzeImageWithClaude, extractTextFromPDF, analyzeMultipleImages } from '@/lib/services/media-analysis.service';
@@ -91,16 +123,20 @@ export async function POST(req: NextRequest) {
     // ✅ Process media inputs and enrich the query
     let enrichedQuery = query.trim();
     const mediaContextParts: string[] = [];
+    let rawImageAnalysisText: string | null = null;
 
     // Process images from camera/attachments
     const imageFiles = files.filter(f => f.type.startsWith('image/'));
     const docFiles = files.filter(f => !f.type.startsWith('image/'));
+    const isImageQuery = imageFiles.length > 0;
     try {
         if (imageFiles.length === 1) {
           console.log('🖼️ Analyzing single image:', imageFiles[0].name);
           const buffer = Buffer.from(await imageFiles[0].arrayBuffer());
-          const analysis = await analyzeImageWithClaude(buffer, imageFiles[0].type);
-          mediaContextParts.push(`[Image content: ${analysis}]`);
+          const analysis = await analyzeImageWithClaude(buffer, imageFiles[0].type); //Internally we use gemini only for multi-image analysis, single image is sent to Claude for analysis to get more descriptive insights. We can experiment with Gemini for single image analysis in the future.
+          rawImageAnalysisText = analysis;
+          const researchContext = extractVisionTextForResearch(analysis);
+          mediaContextParts.push(`[Educational image analysis:\n${researchContext}]`);
           console.log('✅ Image analyzed');
         } else if (imageFiles.length > 1) {
           console.log('🖼️ Analyzing multiple images:', imageFiles.length);
@@ -111,7 +147,9 @@ export async function POST(req: NextRequest) {
             }))
           );
           const analysis = await analyzeMultipleImages(imageData);
-          mediaContextParts.push(`[Images content: ${analysis}]`);
+          rawImageAnalysisText = analysis;
+          const multiResearchContext = extractVisionTextForResearch(analysis);
+          mediaContextParts.push(`[Educational image analysis:\n${multiResearchContext}]`);
           console.log('✅ Multiple images analyzed');
         }
       } catch (error) {
@@ -190,8 +228,8 @@ export async function POST(req: NextRequest) {
       console.log('🚫 Quick moderation failed - running full check');
     }
 
-    // Step 2: Full AI moderation
-    const shouldRunFullModeration = (userAge && userAge < 18) || quickCheckFailed;
+    // Step 2: Full AI moderation — skip for image queries (Vision pipeline is already trusted)
+    const shouldRunFullModeration = !isImageQuery && ((userAge && userAge < 18) || quickCheckFailed);
 
     if (shouldRunFullModeration) {
       console.log('🛡️ Running content moderation...');
@@ -232,7 +270,11 @@ export async function POST(req: NextRequest) {
         // Pre-generate quiz server-side so results page loads with quiz already available.
         // Eliminates client-side router.refresh() call in InteractiveResultsView.
         await generateAndSaveQuizForQuery(result.queryId, enrichedQuery, learningLevel);
+      } else if (rawImageAnalysisText) {
+        // Image query: use Gemini Vision analysis directly as the explanation
+        await generateContentFromImageAnalysis(result.queryId, rawImageAnalysisText);
       } else {
+        // Text-only / audio / PDF query: generate Groq article from web research
         await generateContentForQuery(result.queryId);
       }
     } catch (contentError) {

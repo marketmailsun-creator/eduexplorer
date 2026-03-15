@@ -162,7 +162,9 @@ export default async function ResultsPage({
           {/* Title */}
           <div>
             <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-white leading-tight">
-              {query.queryText}
+              {query.topicDetected && query.topicDetected !== 'Image Analysis' && query.topicDetected !== 'Document Analysis'
+                ? query.topicDetected
+                : query.queryText}
             </h1>
             {/* <p className="text-xs sm:text-sm text-purple-200 mt-1">
               Level: {levelLabel}

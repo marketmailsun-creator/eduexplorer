@@ -23,17 +23,29 @@ export async function analyzeImageWithClaude(
       {
         text: `Analyze this image thoroughly in an educational context. Be exhaustive and precise.
 
-1. Extract ALL visible text exactly as written — every word, number, symbol, label, and option
-2. MATH/SCIENCE PROBLEMS: If the image contains a math problem, equation, or science question:
-   a. Write out the full problem statement exactly
-   b. Solve it completely step-by-step, showing all working and calculations
-   c. State the final answer clearly
-   d. Identify the method/concept used (e.g. quadratic formula, integration by parts, Newton's 2nd law)
-3. MULTIPLE CHOICE: Include the question AND all answer options (A, B, C, D) with the correct answer identified
-4. Identify the subject area (algebra, geometry, calculus, physics, chemistry, biology, history, etc.)
-5. If it is a diagram, chart, or graph: describe all labels, axes, values, and what it represents
+Return your response as a valid JSON object with this exact structure:
+{
+  "subject_area": "The academic subject and specific topic (e.g. 'Mathematics: Geometry', 'Physics: Newton Laws', 'Chemistry: Organic Reactions')",
+  "sections": [
+    {
+      "title": "Section heading",
+      "content": "Section body text. Use \\n for line breaks within content.",
+      "subsections": [
+        { "title": "Subsection heading", "content": "Subsection body text" }
+      ]
+    }
+  ]
+}
 
-Reproduce every visible piece of text. This content will be used as a learning and research query.`,
+For the sections array include:
+1. "Extracted Text" section — reproduce ALL visible text from the image exactly as written (every word, number, symbol, label, option)
+2. One section per problem or question, titled descriptively (e.g. "Analysis of Multiple-Choice Question", "Algebra Problem Solution")
+   - For each problem include subsections: "Full Problem Statement", "Method/Concept Used", "Step-by-step Solution", "Final Answer"
+   - For math/science: solve completely step-by-step showing all working
+   - For multiple choice: include all options and identify the correct answer with explanation
+3. If diagrams/charts/graphs are present: one "Diagram Description" section with labels, axes, and values
+
+Return ONLY the JSON object — no text before or after it.`,
       },
     ]);
 
@@ -111,13 +123,27 @@ export async function analyzeMultipleImages(
       {
         text: `Analyze all these images together in an educational context.
 
-1. Extract ALL visible text from each image exactly as written
-2. For each image: describe what is shown and reproduce all text, equations, or problems
-3. Identify how the images relate to each other
-4. State the overall educational topic or subject area
-5. List all questions or problems shown across all images
+Return your response as a valid JSON object with this exact structure:
+{
+  "subject_area": "The overall academic subject and topic across all images",
+  "sections": [
+    {
+      "title": "Section heading",
+      "content": "Section body text. Use \\n for line breaks within content.",
+      "subsections": [
+        { "title": "Subsection heading", "content": "Subsection body text" }
+      ]
+    }
+  ]
+}
 
-Be exhaustive — reproduce every piece of text visible. This content will be used as a learning query.`,
+For the sections array include:
+1. "Extracted Text" — all visible text from all images combined
+2. One section per image or problem, titled descriptively
+3. "Relationships Between Images" section if the images relate to each other or form a sequence
+4. For math/science problems: include subsections for Full Problem Statement, Method/Concept Used, Step-by-step Solution, Final Answer
+
+Return ONLY the JSON object — no text before or after it.`,
       },
     ]);
 
