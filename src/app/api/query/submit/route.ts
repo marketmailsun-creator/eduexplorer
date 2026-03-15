@@ -33,7 +33,7 @@ function extractVisionTextForResearch(visionOutput: string): string {
 }
 import { auth } from '@/auth';
 import { processResearchQuery } from '@/lib/services/research.service';
-import { generateContentForQuery, generateContentFromImageAnalysis } from '@/lib/services/content.service';
+import { generateContentForQuery, generateContentFromImageAnalysis, generateContentFromDocumentQuery, parseImageAnalysisHybrid } from '@/lib/services/content.service';
 import { generateAndSaveQuizForQuery } from '@/lib/services/practice-questions-generator';
 import { moderateContent, getModerationErrorMessage, quickModerationCheck } from '@/lib/services/content-moderation.service';
 import { analyzeImageWithClaude, extractTextFromPDF, analyzeMultipleImages } from '@/lib/services/media-analysis.service';
@@ -267,14 +267,42 @@ export async function POST(req: NextRequest) {
 
     try {
       if (autoQuizFlag) {
-        // Pre-generate quiz server-side so results page loads with quiz already available.
-        // Eliminates client-side router.refresh() call in InteractiveResultsView.
-        await generateAndSaveQuizForQuery(result.queryId, enrichedQuery, learningLevel);
+        if (rawImageAnalysisText) {
+          // Image + autoQuiz: article (sets topicDetected) + similar-problem quiz
+          await generateContentFromImageAnalysis(result.queryId, rawImageAnalysisText);
+          const { formattedMarkdown } = parseImageAnalysisHybrid(rawImageAnalysisText);
+          const updatedQuery = await prisma.query.findUnique({
+            where: { id: result.queryId },
+            select: { topicDetected: true },
+          });
+          const quizTopic = updatedQuery?.topicDetected || enrichedQuery.slice(0, 80);
+          await generateAndSaveQuizForQuery(result.queryId, quizTopic, learningLevel, formattedMarkdown);
+        } else if (docFiles.length > 0) {
+          // Document + autoQuiz: article (extracts topic) + document-specific quiz
+          await generateContentFromDocumentQuery(result.queryId);
+          const docArticle = await prisma.content.findFirst({
+            where: { queryId: result.queryId, contentType: 'article' },
+            select: { data: true },
+          });
+          const docArticleText = (docArticle?.data as any)?.text as string | undefined;
+          const updatedDocQuery = await prisma.query.findUnique({
+            where: { id: result.queryId },
+            select: { topicDetected: true },
+          });
+          const docQuizTopic = updatedDocQuery?.topicDetected || enrichedQuery.slice(0, 80);
+          await generateAndSaveQuizForQuery(result.queryId, docQuizTopic, learningLevel, docArticleText);
+        } else {
+          // Text-only / audio autoQuiz: pre-generate quiz from research topic
+          await generateAndSaveQuizForQuery(result.queryId, enrichedQuery, learningLevel);
+        }
       } else if (rawImageAnalysisText) {
-        // Image query: use Gemini Vision analysis directly as the explanation
+        // Image query: Gemini Vision analysis as article
         await generateContentFromImageAnalysis(result.queryId, rawImageAnalysisText);
+      } else if (docFiles.length > 0) {
+        // Document query: generate article + extract clean topic
+        await generateContentFromDocumentQuery(result.queryId);
       } else {
-        // Text-only / audio / PDF query: generate Groq article from web research
+        // Text-only / audio query: generate Groq article from web research
         await generateContentForQuery(result.queryId);
       }
     } catch (contentError) {

@@ -749,12 +749,26 @@ export function InteractiveResultsView({
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center gap-2 text-base">
                 <Brain className="h-5 w-5 text-pink-600" />
-                Practice Quiz
-                {quizSets.length > 1 && (
-                  <span className="text-xs font-normal text-pink-500 ml-1">
-                    Set {(latestQuiz?.data as any)?.setNumber ?? quizSets.length}
-                  </span>
-                )}
+                <div>
+                  <div className="flex items-center gap-2">
+                    Practice Quiz
+                    {quizSets.length > 1 && (
+                      <span className="text-xs font-normal text-pink-500">
+                        Set {(latestQuiz?.data as any)?.setNumber ?? quizSets.length}
+                      </span>
+                    )}
+                  </div>
+                  {(() => {
+                    const label = query.topicDetected
+                      ? query.topicDetected
+                      : query.queryText.length > 60
+                        ? query.queryText.slice(0, 57) + '…'
+                        : query.queryText;
+                    return (
+                      <p className="text-xs font-normal text-pink-500 mt-0.5 leading-tight">{label}</p>
+                    );
+                  })()}
+                </div>
               </CardTitle>
               <div className="flex items-center gap-1">
                 <button

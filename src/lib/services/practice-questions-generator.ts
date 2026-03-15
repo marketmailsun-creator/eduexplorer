@@ -50,6 +50,8 @@ const SET_FOCUSES = [
 /**
  * PRIMARY: Generate a quiz based purely on TOPIC (no article needed).
  * This produces diverse, non-repetitive questions across regenerations.
+ * When referenceContent is provided (image/document queries), generates
+ * similar problems of the same type instead of generic topic questions.
  */
 export async function generateTopicQuiz(
   topic: string,
@@ -57,6 +59,7 @@ export async function generateTopicQuiz(
   level: string = 'college',
   previousQuestions: string[] = [],
   setNumber: number = 1,
+  referenceContent?: string,
 ): Promise<PracticeQuiz> {
 
   if (!genAI) {
@@ -64,12 +67,56 @@ export async function generateTopicQuiz(
     return generateFallbackTopicQuestions(topic, count, level, setNumber);
   }
 
-  const focusArea = SET_FOCUSES[(setNumber - 1) % SET_FOCUSES.length];
   const prevBlock = previousQuestions.length > 0
     ? `\n\nIMPORTANT - Do NOT generate questions similar to these already-asked questions:\n${previousQuestions.slice(-30).map((q, i) => `${i + 1}. ${q}`).join('\n')}\n`
     : '';
 
-  const prompt = `You are an expert educator creating a practice quiz (Set #${setNumber}) about "${topic}" for ${level}-level students.
+  const jsonSchema = `{
+  "topic": "${topic}",
+  "level": "${level}",
+  "setNumber": ${setNumber},
+  "totalQuestions": ${count},
+  "generatedAt": "${new Date().toISOString()}",
+  "questions": [
+    {
+      "id": 1,
+      "question": "...",
+      "type": "multiple-choice",
+      "difficulty": "medium",
+      "options": ["Option A", "Option B", "Option C", "Option D"],
+      "correctAnswer": "Option A",
+      "explanation": "Step 1: ... Step 2: ... Final answer: ...",
+      "category": "problem-solving"
+    }
+  ]
+}`;
+
+  let prompt: string;
+
+  if (referenceContent) {
+    // Similar-problem prompt: use the solved example as reference
+    prompt = `You are an expert educator. A student just worked through this problem/content:
+
+---
+${referenceContent.slice(0, 3000)}
+---
+
+Generate exactly ${count} similar practice problems that test the SAME concept and skill type, but with different values, shapes, or scenarios. Each problem should:
+1. Be the same TYPE as the reference (e.g., if the reference is an area problem, generate area/perimeter/volume problems)
+2. Use different numbers, dimensions, or contexts — never reuse exact values from the reference
+3. Be self-contained — include all necessary information in the question itself
+4. Include a complete step-by-step solution in the "explanation" field
+5. Be appropriate for ${level} level students
+${prevBlock}
+Difficulty mix: 20% easy, 60% medium, 20% hard
+Mix types: 70% multiple-choice (4 options, 1 correct), 30% true-false
+
+Return ONLY valid JSON (no markdown, no backticks):
+${jsonSchema}`;
+  } else {
+    // Topic-first prompt: existing behavior for text-only queries
+    const focusArea = SET_FOCUSES[(setNumber - 1) % SET_FOCUSES.length];
+    prompt = `You are an expert educator creating a practice quiz (Set #${setNumber}) about "${topic}" for ${level}-level students.
 
 This set should focus specifically on: ${focusArea}
 ${prevBlock}
@@ -86,25 +133,8 @@ Rules:
 4. Do NOT repeat any question from the excluded list above
 
 Return ONLY valid JSON (no markdown, no backticks):
-{
-  "topic": "${topic}",
-  "level": "${level}",
-  "setNumber": ${setNumber},
-  "totalQuestions": ${count},
-  "generatedAt": "${new Date().toISOString()}",
-  "questions": [
-    {
-      "id": 1,
-      "question": "...",
-      "type": "multiple-choice",
-      "difficulty": "medium",
-      "options": ["Option A", "Option B", "Option C", "Option D"],
-      "correctAnswer": "Option A",
-      "explanation": "Because...",
-      "category": "concept"
-    }
-  ]
-}`;
+${jsonSchema}`;
+  }
 
   try {
     const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
@@ -194,11 +224,16 @@ export async function generatePracticeQuestions(
  * Idempotent: if a quiz already exists for this queryId, returns immediately.
  * Called from the submit route when autoQuiz=true, so the results page
  * loads with the quiz already in the DB (no router.refresh() needed).
+ *
+ * @param referenceContent - For image/document queries: the Vision analysis or
+ *   article text used as a reference to generate similar problems instead of
+ *   generic topic questions.
  */
 export async function generateAndSaveQuizForQuery(
   queryId: string,
   queryText: string,
   complexityLevel: string,
+  referenceContent?: string,
 ): Promise<void> {
   // Idempotent check
   const existing = await prisma.content.findFirst({
@@ -210,13 +245,14 @@ export async function generateAndSaveQuizForQuery(
   }
 
   console.log(`🧠 Pre-generating quiz for autoQuiz: ${queryText}`);
-  
+
   const quiz = await generateTopicQuiz(
     queryText,
     10,
     complexityLevel || 'college',
     [],
     1,
+    referenceContent,
   );
 
   await prisma.content.create({

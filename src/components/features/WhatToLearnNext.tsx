@@ -86,6 +86,8 @@ export function WhatToLearnNext({ queryId, currentTopic, hasQuiz = false }: What
   // Nothing to show
   if (!suggestions.length && hasQuiz) return null;
 
+  const displayTopic = currentTopic.length > 60 ? currentTopic.slice(0, 57) + '…' : currentTopic;
+
   return (
     <div className="mt-10 space-y-4">
 
@@ -105,7 +107,7 @@ export function WhatToLearnNext({ queryId, currentTopic, hasQuiz = false }: What
                 Test your knowledge!
               </p>
               <p className="text-xs sm:text-sm text-gray-500">
-                Take the quiz on <span className="font-medium text-gray-700">"{currentTopic}"</span>
+                Take the quiz on <span className="font-medium text-gray-700">"{displayTopic}"</span>
               </p>
             </div>
           </div>

@@ -146,6 +146,15 @@ export default async function ResultsPage({
   };
   const levelLabel = LEVEL_LABELS[query.complexityLevel ?? ''] ?? (query.complexityLevel || 'College');
 
+  // Clean topic label — same logic as the <h1> title
+  const topicLabel = (
+    query.topicDetected &&
+    query.topicDetected !== 'Image Analysis' &&
+    query.topicDetected !== 'Document Analysis'
+  )
+    ? query.topicDetected
+    : query.queryText;
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header Section — gradient design */}
@@ -236,7 +245,7 @@ export default async function ResultsPage({
           />
         </div>
         <div className="px-4 sm:px-6 pb-10 max-w-7xl mx-auto">
-          <WhatToLearnNext queryId={id} currentTopic={query.queryText} hasQuiz={hasQuiz} />
+          <WhatToLearnNext queryId={id} currentTopic={topicLabel} hasQuiz={hasQuiz} />
         </div>
         {sharedContent && (
           <div className="mt-8">

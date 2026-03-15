@@ -152,6 +152,89 @@ export async function generateContentForQuery(queryId: string) {
   return articleContent;
 }
 
+// ── Document query topic extraction ───────────────────────────────────────────
+
+/**
+ * Extract a clean topic label from Gemini research content.
+ * Takes the first meaningful sentence, stripping common "This document discusses..." prefixes.
+ * Returns null if content is too short or generic.
+ */
+export function extractTopicFromResearchContent(cleanedContent: string): string | null {
+  if (!cleanedContent || cleanedContent.length < 10) return null;
+
+  const stripped = cleanedContent
+    .slice(0, 400)
+    .replace(/^(this document (discusses|covers|is about|explains|presents|contains)|the (document|content|provided (document|text)|following content) (discusses|covers|is about|explains|presents)|based on the (document|content|provided)[,\s]|please analyze and explain the following:?|analyzing and explaining:?)\s*/i, '')
+    .trim();
+
+  if (!stripped || stripped.length < 5) return null;
+
+  // Extract first sentence
+  const firstSentence = stripped.split(/(?<=[.!?])\s+|\n/)[0].trim();
+
+  if (!firstSentence || firstSentence.length < 5) return null;
+  if (firstSentence.length > 100) return stripped.slice(0, 80).trim() || null;
+  // Reject all-caps (likely a heading artifact)
+  if (firstSentence === firstSentence.toUpperCase()) return null;
+
+  return firstSentence;
+}
+
+/**
+ * For document (PDF/text) queries: generate Groq article from research data
+ * AND extract a clean topic from the research content to set as topicDetected.
+ * Mirrors generateContentFromImageAnalysis() for document attachments.
+ */
+export async function generateContentFromDocumentQuery(queryId: string): Promise<void> {
+  const research = await prisma.researchData.findUnique({
+    where: { queryId },
+    include: { query: true },
+  });
+
+  if (!research) throw new Error('Research data not found');
+
+  console.log(`📄 Generating document query content for: ${queryId}`);
+
+  const fullResearchContent = (research.rawData as any)?.cleanedContent || research.summary;
+  const sourceUrls: string[] = Array.isArray((research.rawData as any)?.citations)
+    ? (research.rawData as any).citations
+    : [];
+
+  // 1. Extract a clean topic from the Gemini research response
+  const extractedTopic = extractTopicFromResearchContent(fullResearchContent);
+  const topicLabel = extractedTopic || 'Document Analysis';
+
+  // 2. Update topicDetected with the clean label
+  if (extractedTopic) {
+    await prisma.query.update({
+      where: { id: queryId },
+      data: { topicDetected: extractedTopic },
+    });
+    console.log(`✅ topicDetected set to: ${extractedTopic}`);
+  }
+
+  // 3. Generate Groq article using clean topic as title
+  console.log(`📊 Research input: ${fullResearchContent.length} chars, ${sourceUrls.length} sources`);
+
+  const article = await generateArticleWithGroq(
+    fullResearchContent,
+    research.query.queryText,
+    research.query.complexityLevel || 'college',
+    sourceUrls
+  );
+
+  const articleContent = await prisma.content.create({
+    data: {
+      queryId,
+      contentType: 'article',
+      title: topicLabel,
+      data: { text: article },
+    },
+  });
+
+  console.log(`✅ Document query article created: ${articleContent.id}`);
+}
+
 // ── Image analysis hybrid parser ──────────────────────────────────────────────
 
 interface ParsedAnalysis {
