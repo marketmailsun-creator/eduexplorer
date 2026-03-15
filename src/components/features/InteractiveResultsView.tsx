@@ -81,26 +81,61 @@ function renderArticleWithHeadings(text: string) {
   const lines = text.split('\n');
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const elements: any[] = [];
-  let paragraphBuffer: string[] = [];
   let keyCounter = 0;
 
-  const flushParagraph = () => {
-    const content = paragraphBuffer.join('\n').trim();
-    if (content) {
+  // Pending list items — flushed when line type changes or a heading is hit
+  let listType: 'ol' | 'ul' | null = null;
+  let listItems: string[] = [];
+
+  const flushList = () => {
+    if (listItems.length === 0) return;
+    if (listType === 'ol') {
       elements.push(
-        <p key={`p-${keyCounter++}`} className="text-gray-700 leading-relaxed text-sm mb-3">
-          {content}
-        </p>
+        <ol key={`ol-${keyCounter++}`} className="list-decimal list-outside pl-5 text-gray-700 text-sm mb-3 space-y-1">
+          {listItems.map((item, i) => (
+            <li key={i} className="leading-relaxed">{item}</li>
+          ))}
+        </ol>
+      );
+    } else {
+      elements.push(
+        <ul key={`ul-${keyCounter++}`} className="list-disc list-outside pl-5 text-gray-700 text-sm mb-3 space-y-1">
+          {listItems.map((item, i) => (
+            <li key={i} className="leading-relaxed">{item}</li>
+          ))}
+        </ul>
       );
     }
-    paragraphBuffer = [];
+    listType = null;
+    listItems = [];
+  };
+
+  // Returns the content text if line is a numbered/lettered/step line, else null
+  const isNumberedLine = (line: string): string | null => {
+    const numMatch = line.match(/^(\d+)[.)]\s+(.+)$/);
+    if (numMatch) return numMatch[2];
+    const letterMatch = line.match(/^([a-zA-Z])[.)]\s+(.+)$/);
+    if (letterMatch) return `${letterMatch[1].toUpperCase()}. ${letterMatch[2]}`;
+    const stepMatch = line.match(/^Step\s+\d+\s*[:\-–]\s*(.+)$/i);
+    if (stepMatch) return stepMatch[1];
+    const stepLabel = line.match(/^(Step\s+\d+)$/i);
+    if (stepLabel) return stepLabel[1];
+    return null;
+  };
+
+  // Returns the content text if line is a bullet line, else null
+  const isBulletLine = (line: string): string | null => {
+    if ((line.startsWith('- ') || line.startsWith('• ') || line.startsWith('* ')) && line.length > 2) {
+      return line.slice(2).trim();
+    }
+    return null;
   };
 
   for (const line of lines) {
     // Match ## N. Title or ## Title
     const h2Match = line.match(/^##\s+(?:(\d+)\.?\s+)?(.+)$/);
     if (h2Match) {
-      flushParagraph();
+      flushList();
       const sectionNum = h2Match[1] ? parseInt(h2Match[1]) : 0;
       const headingText = h2Match[2].trim();
       const colors = SECTION_COLORS[sectionNum] ?? DEFAULT_SECTION_COLOR;
@@ -115,7 +150,7 @@ function renderArticleWithHeadings(text: string) {
     // Match ### Title
     const h3Match = line.match(/^###\s+(.+)$/);
     if (h3Match) {
-      flushParagraph();
+      flushList();
       elements.push(
         <h3 key={`h3-${keyCounter++}`} className="text-sm font-semibold text-gray-700 mt-4 mb-1">
           {h3Match[1].trim()}
@@ -124,10 +159,42 @@ function renderArticleWithHeadings(text: string) {
       continue;
     }
 
-    paragraphBuffer.push(line);
+    const trimmed = line.trim();
+
+    // Empty line — end current list, emit nothing
+    if (!trimmed) {
+      flushList();
+      continue;
+    }
+
+    // Numbered / step line → <ol>
+    const numberedText = isNumberedLine(trimmed);
+    if (numberedText) {
+      if (listType === 'ul') flushList();
+      listType = 'ol';
+      listItems.push(numberedText);
+      continue;
+    }
+
+    // Bullet line → <ul>
+    const bulletText = isBulletLine(trimmed);
+    if (bulletText) {
+      if (listType === 'ol') flushList();
+      listType = 'ul';
+      listItems.push(bulletText);
+      continue;
+    }
+
+    // Prose line — flush any open list, emit as its own paragraph
+    flushList();
+    elements.push(
+      <p key={`p-${keyCounter++}`} className="text-gray-700 leading-relaxed text-sm mb-3">
+        {trimmed}
+      </p>
+    );
   }
 
-  flushParagraph();
+  flushList();
   return elements;
 }
 
@@ -682,12 +749,26 @@ export function InteractiveResultsView({
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center gap-2 text-base">
                 <Brain className="h-5 w-5 text-pink-600" />
-                Practice Quiz
-                {quizSets.length > 1 && (
-                  <span className="text-xs font-normal text-pink-500 ml-1">
-                    Set {(latestQuiz?.data as any)?.setNumber ?? quizSets.length}
-                  </span>
-                )}
+                <div>
+                  <div className="flex items-center gap-2">
+                    Practice Quiz
+                    {quizSets.length > 1 && (
+                      <span className="text-xs font-normal text-pink-500">
+                        Set {(latestQuiz?.data as any)?.setNumber ?? quizSets.length}
+                      </span>
+                    )}
+                  </div>
+                  {(() => {
+                    const label = query.topicDetected
+                      ? query.topicDetected
+                      : query.queryText.length > 60
+                        ? query.queryText.slice(0, 57) + '…'
+                        : query.queryText;
+                    return (
+                      <p className="text-xs font-normal text-pink-500 mt-0.5 leading-tight">{label}</p>
+                    );
+                  })()}
+                </div>
               </CardTitle>
               <div className="flex items-center gap-1">
                 <button

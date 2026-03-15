@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
     // Get the query
     const query = await prisma.query.findUnique({
       where: { id: queryId },
-      select: { id: true, userId: true, queryText: true, complexityLevel: true },
+      select: { id: true, userId: true, queryText: true, topicDetected: true, complexityLevel: true },
     });
 
     if (!query || query.userId !== session.user.id) {
@@ -77,13 +77,28 @@ export async function POST(req: NextRequest) {
 
     const setNumber = existingQuizzes.length + 1;
 
-    // Generate new topic-first quiz (NOT from article text)
+    // Generate quiz — use article content as reference for image/document queries
+    // (topicDetected is only set for image/document queries via hybrid parser)
+    const effectiveTopic = query.topicDetected || query.queryText;
+    let referenceContent: string | undefined;
+    if (query.topicDetected) {
+      const articleContent = await prisma.content.findFirst({
+        where: { queryId, contentType: 'article' },
+        select: { data: true },
+      });
+      const articleText = (articleContent?.data as any)?.text as string | undefined;
+      if (articleText && articleText.length > 100) {
+        referenceContent = articleText;
+      }
+    }
+
     const quiz = await generateTopicQuiz(
-      query.queryText,
+      effectiveTopic,
       numQuestions,
       query.complexityLevel || 'college',
       previousQuestions,
-      setNumber
+      setNumber,
+      referenceContent,
     );
 
     // Save as a new quiz set
@@ -91,7 +106,7 @@ export async function POST(req: NextRequest) {
       data: {
         queryId,
         contentType: 'quiz',
-        title: `${query.queryText} - Quiz Set ${setNumber}`,
+        title: `${effectiveTopic} - Quiz Set ${setNumber}`,
         data: {
           status: 'completed',
           setNumber,

@@ -146,6 +146,15 @@ export default async function ResultsPage({
   };
   const levelLabel = LEVEL_LABELS[query.complexityLevel ?? ''] ?? (query.complexityLevel || 'College');
 
+  // Clean topic label — same logic as the <h1> title
+  const topicLabel = (
+    query.topicDetected &&
+    query.topicDetected !== 'Image Analysis' &&
+    query.topicDetected !== 'Document Analysis'
+  )
+    ? query.topicDetected
+    : query.queryText;
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header Section — gradient design */}
@@ -162,7 +171,9 @@ export default async function ResultsPage({
           {/* Title */}
           <div>
             <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-white leading-tight">
-              {query.queryText}
+              {query.topicDetected && query.topicDetected !== 'Image Analysis' && query.topicDetected !== 'Document Analysis'
+                ? query.topicDetected
+                : query.queryText}
             </h1>
             {/* <p className="text-xs sm:text-sm text-purple-200 mt-1">
               Level: {levelLabel}
@@ -195,9 +206,9 @@ export default async function ResultsPage({
           <div className="flex gap-2 mt-3 flex-wrap">
             {isOwner && (
               <>
-                <ShareButton queryId={query.id} title={query.queryText} />
+                <ShareButton queryId={query.id} title={topicLabel} />
                 <WhatsAppShareButton
-                  topic={query.queryText}
+                  topic={topicLabel}
                   summary={shareableText}
                   queryId={query.id}
                 />
@@ -234,7 +245,7 @@ export default async function ResultsPage({
           />
         </div>
         <div className="px-4 sm:px-6 pb-10 max-w-7xl mx-auto">
-          <WhatToLearnNext queryId={id} currentTopic={query.queryText} hasQuiz={hasQuiz} />
+          <WhatToLearnNext queryId={id} currentTopic={topicLabel} hasQuiz={hasQuiz} />
         </div>
         {sharedContent && (
           <div className="mt-8">

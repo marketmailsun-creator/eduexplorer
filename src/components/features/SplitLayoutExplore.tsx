@@ -480,7 +480,7 @@ interface SplitLayoutExploreProps {
         <div className="flex justify-end mb-2 sm:mb-5">
           <DailyGoalWidget compact />
         </div>
-        <ContinueLearning />
+        {/* <ContinueLearning /> */}
         {/* Main Layout - Stack on Mobile, Side-by-Side on Desktop */}
         <div className="flex flex-col lg:grid lg:grid-cols-12 gap-3 sm:gap-6">
 
@@ -676,7 +676,7 @@ interface SplitLayoutExploreProps {
               </div>
             </div> }
             {/* Trending topics */}
-            <div className="mt-4 sm:mt-6">
+            {/* <div className="mt-4 sm:mt-6">
               <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
                 🔥 Trending Topics
               </h2>
@@ -693,7 +693,7 @@ interface SplitLayoutExploreProps {
                   </button>
                 ))}
               </div>
-            </div>
+            </div> */}
           </div>
 
           {/* RIGHT: Features Showcase - Mobile Optimized */}

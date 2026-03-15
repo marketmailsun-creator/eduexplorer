@@ -41,7 +41,7 @@ export async function GET(
     // Fetch the topic from DB
     const query = await prisma.query.findUnique({
       where: { id: queryId },
-      select: { queryText: true, topicDetected: true },
+       select: { queryText: true, topicDetected: true },
     });
     if (!query) return NextResponse.json({ suggestions: [] });
 
