@@ -3,87 +3,100 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
-const CATEGORIES = [
-  {
-    emoji: '🔬',
-    label: 'STEM',
-    color: 'border-blue-200 hover:bg-blue-50',
-    topics: ['Quantum Physics', 'DNA Replication', 'Machine Learning', 'Calculus'],
-  },
-  {
-    emoji: '🌍',
-    label: 'History',
-    color: 'border-amber-200 hover:bg-amber-50',
-    topics: ['World War II', 'Ancient Rome', 'Indian Independence', 'The Renaissance'],
-  },
-  {
-    emoji: '🗣️',
-    label: 'Languages',
-    color: 'border-green-200 hover:bg-green-50',
-    topics: ['English Grammar', 'French Basics', 'Spanish Verbs', 'Latin Roots'],
-  },
-  {
-    emoji: '💰',
-    label: 'Finance',
-    color: 'border-yellow-200 hover:bg-yellow-50',
-    topics: ['Stock Market', 'Compound Interest', 'Mutual Funds', 'GST India'],
-  },
-  {
-    emoji: '🎨',
-    label: 'Arts',
-    color: 'border-pink-200 hover:bg-pink-50',
-    topics: ['Impressionism', 'Music Theory', 'Photography', 'Film Direction'],
-  },
-  {
-    emoji: '💻',
-    label: 'Technology',
-    color: 'border-purple-200 hover:bg-purple-50',
-    topics: ['React.js', 'System Design', 'Cybersecurity', 'Data Structures'],
-  },
-];
-
 export function TopicDiscoveryHub() {
   const router = useRouter();
-  const [recentTopics, setRecentTopics] = useState<string[]>([]);
-  const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
+  const [recentTopics, setRecentTopics] = useState<{ id: string; topic: string }[]>([]);
+  const [trendingTopics, setTrendingTopics] = useState<{ full: string; display: string }[]>([]);
+  const [trendingLoading, setTrendingLoading] = useState(true);
+
+  useEffect(() => {
+    fetch('/api/query/trending')
+      .then(r => r.ok ? r.json() : { topics: [] })
+      .then(({ topics }) => {
+        const cleaned = (topics as string[])
+          .filter(Boolean)
+          .map((t: string) => ({
+            full: t,
+            display: t.length > 40 ? t.slice(0, 37) + '…' : t,
+          }))
+          .slice(0, 6);
+        setTrendingTopics(cleaned);
+      })
+      .catch(() => {})
+      .finally(() => setTrendingLoading(false));
+  }, []);
 
   useEffect(() => {
     fetch('/api/query/history')
       .then(r => r.ok ? r.json() : { queries: [] })
       .then(({ queries }) => {
-        const topics: string[] = [];
+        const items: { id: string; topic: string }[] = [];
         const seen = new Set<string>();
         for (const q of (queries ?? []).slice(0, 20)) {
           const t = (q.topicDetected || q.queryText || '').trim();
           if (t && !seen.has(t)) {
             seen.add(t);
-            topics.push(t.length > 35 ? t.slice(0, 35) + '…' : t);
-            if (topics.length >= 6) break;
+            items.push({
+              id: q.id,
+              topic: t.length > 35 ? t.slice(0, 35) + '…' : t,
+            });
+            if (items.length >= 5) break;
           }
         }
-        setRecentTopics(topics);
+        setRecentTopics(items);
       })
       .catch(() => {});
   }, []);
 
-  const navigate = (topic: string) => {
-    router.push(`/explore?q=${encodeURIComponent(topic)}`);
+  const navigateTrending = (full: string) => {
+    router.push(`/explore?q=${encodeURIComponent(full)}`, { scroll: false });
+    setTimeout(() => {
+      document.getElementById('explore-search')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
   };
 
   return (
     <div className="w-full mb-8 space-y-6">
-      {/* Recent for this user */}
+      {/* Trending Now — platform-wide popular topics */}
+      {(trendingLoading || trendingTopics.length > 0) && (
+        <div>
+          <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
+            🔥 Trending Now
+          </h2>
+          <div className="flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
+            {trendingLoading
+              ? [1, 2, 3, 4, 5, 6].map(i => (
+                  <div key={i} className="flex-shrink-0 h-8 w-24 rounded-full bg-orange-100 animate-pulse" />
+                ))
+              : trendingTopics.map(item => (
+                  <button
+                    key={item.full}
+                    onClick={() => navigateTrending(item.full)}
+                    className="flex-shrink-0 px-3 py-1.5 text-sm font-medium bg-gradient-to-r from-orange-50 to-amber-50
+                               border border-orange-200 rounded-full text-orange-700
+                               hover:from-orange-100 hover:to-amber-100 hover:border-orange-400
+                               transition-colors shadow-sm"
+                  >
+                    {item.display}
+                  </button>
+                ))
+            }
+          </div>
+        </div>
+      )}
+
+      {/* Continue Exploring — user's recent results */}
       {recentTopics.length > 0 && (
         <div>
           <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
             📚 Continue Exploring
           </h2>
-          <div className="flex flex-wrap gap-2">
-            {recentTopics.map(topic => (
+          <div className="flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
+            {recentTopics.map(({ id, topic }) => (
               <button
-                key={topic}
-                onClick={() => navigate(topic)}
-                className="px-3 py-1.5 text-sm font-medium bg-gradient-to-r from-purple-50 to-indigo-50
+                key={id}
+                onClick={() => router.push(`/results/${id}`)}
+                className="flex-shrink-0 px-3 py-1.5 text-sm font-medium bg-gradient-to-r from-purple-50 to-indigo-50
                            border border-purple-200 rounded-full text-purple-700
                            hover:from-purple-100 hover:to-indigo-100 hover:border-purple-400
                            transition-colors shadow-sm"
@@ -94,75 +107,6 @@ export function TopicDiscoveryHub() {
           </div>
         </div>
       )}
-
-      {/* Subject categories */}
-      <div>
-        <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
-          🗂️ Browse by Subject
-        </h2>
-
-        {/* Mobile: horizontal scrollable chip strip */}
-        <div className="md:hidden">
-          <div className="flex gap-2 overflow-x-auto pb-2" style={{ scrollbarWidth: 'none' }}>
-            {CATEGORIES.map(cat => (
-              <button
-                key={cat.label}
-                onClick={() => setExpandedCategory(expandedCategory === cat.label ? null : cat.label)}
-                className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-full border text-sm font-medium transition-colors ${
-                  expandedCategory === cat.label
-                    ? 'bg-purple-100 border-purple-300 text-purple-700'
-                    : 'bg-white border-gray-200 text-gray-700 hover:border-purple-300 hover:bg-purple-50'
-                }`}
-              >
-                <span>{cat.emoji}</span>
-                <span>{cat.label}</span>
-              </button>
-            ))}
-          </div>
-          {/* Expanded topics for selected category */}
-          {expandedCategory && (() => {
-            const cat = CATEGORIES.find(c => c.label === expandedCategory);
-            return cat ? (
-              <div className="flex flex-wrap gap-2 mt-3">
-                {cat.topics.slice(0, 3).map(t => (
-                  <button
-                    key={t}
-                    onClick={() => navigate(t)}
-                    className="px-3 py-1.5 text-xs bg-indigo-50 border border-indigo-200 rounded-full text-indigo-700 hover:bg-indigo-100 transition-colors"
-                  >
-                    {t}
-                  </button>
-                ))}
-              </div>
-            ) : null;
-          })()}
-        </div>
-
-        {/* Desktop: full 6-column grid */}
-        <div className="hidden md:grid md:grid-cols-3 lg:grid-cols-6 gap-3">
-          {CATEGORIES.map(cat => (
-            <div
-              key={cat.label}
-              className={`bg-white border rounded-xl p-3 ${cat.color} transition-colors`}
-            >
-              <div className="text-2xl mb-1">{cat.emoji}</div>
-              <div className="font-semibold text-gray-800 text-sm mb-2">{cat.label}</div>
-              <div className="space-y-1">
-                {cat.topics.slice(0, 3).map(t => (
-                  <button
-                    key={t}
-                    onClick={() => navigate(t)}
-                    className="block text-xs text-left text-gray-600 hover:text-purple-700
-                               hover:underline w-full truncate"
-                  >
-                    {t}
-                  </button>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
     </div>
   );
 }

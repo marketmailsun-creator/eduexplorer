@@ -206,9 +206,9 @@ export default async function ResultsPage({
           <div className="flex gap-2 mt-3 flex-wrap">
             {isOwner && (
               <>
-                <ShareButton queryId={query.id} title={query.queryText} />
+                <ShareButton queryId={query.id} title={topicLabel} />
                 <WhatsAppShareButton
-                  topic={query.queryText}
+                  topic={topicLabel}
                   summary={shareableText}
                   queryId={query.id}
                 />

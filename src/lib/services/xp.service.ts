@@ -86,7 +86,7 @@ export async function canRedeemXP(
     prisma.user.findUnique({ where: { id: userId }, select: { totalXP: true } }),
     prisma.xPRedemption.findFirst({ where: { userId, status: 'PENDING' } }),
   ]);
-  if (!user || user.totalXP < 100) {
+  if (!user || user.totalXP < 200) {
     return { canRedeem: false, reason: 'Need at least 200 XP to redeem' };
   }
   if (pending) {
